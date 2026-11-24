@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<title>VN Reader — web spike</title>
+<style>
+  :root { --bg:#0a0a0a; --fg:#d8f7f7; --accent:#00e5e5; --dim:#6b7f80; --card:#141818; --ok:#3ddc84; --ko:#ff5c5c; --warn:#ffb000; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.45 system-ui, sans-serif; }
+  body { padding: env(safe-area-inset-top) 0 40px; }
+  h1 { font-size:18px; margin:12px 16px 4px; color:var(--accent); }
+  h2 { font-size:15px; margin:0 0 6px; }
+  .sub { margin:0 16px 10px; color:var(--dim); font-size:13px; }
+
+  /* Reader demo */
+  #reader { position:relative; height:52vh; margin:0 10px; border:1px solid #233; border-radius:10px; background:#060909; overflow:hidden; }
+  #hud { position:absolute; top:6px; left:10px; right:10px; display:flex; justify-content:space-between; font-size:11px; color:var(--dim); pointer-events:none; }
+  #textBox { position:absolute; inset:26px 14px 12px; overflow-y:auto; display:flex; flex-direction:column; }
+  #text { margin:auto 0; font:21px/1.55 Georgia, serif; white-space:pre-wrap; -webkit-user-select:text; user-select:text; }
+  #text .h { visibility:hidden; }            /* not yet typed: keeps layout stable */
+  #text b { font-weight:700; }
+  #pauseIcon { position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-size:64px; opacity:.25; pointer-events:none; }
+  #reader.paused #pauseIcon { display:flex; }
+  #chBar { position:absolute; left:0; bottom:0; height:3px; background:var(--accent); width:0; transition:width .3s; }
+  body.minimal #hud, body.minimal #chBar { display:none; }
+
+  .controls { display:flex; flex-wrap:wrap; gap:6px; margin:8px 10px; }
+  button, select, label.btn { background:#1d2626; color:var(--fg); border:1px solid #2d3a3a; border-radius:8px; padding:8px 10px; font-size:14px; }
+  button.on { background:#004d4d; border-color:var(--accent); }
+  .grow { flex:1; }
+
+  /* Test cards */
+  .card { background:var(--card); margin:10px; padding:12px; border-radius:10px; }
+  .card p { margin:4px 0; color:#b9c9c9; font-size:13.5px; }
+  .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:6px; }
+  .pill { font-size:12px; padding:2px 8px; border-radius:20px; background:#2a3333; color:var(--dim); }
+  .pill.ok { background:#123d26; color:var(--ok); } .pill.ko { background:#3d1212; color:var(--ko); } .pill.warn { background:#3d2e00; color:var(--warn); }
+  .verdict button { padding:6px 10px; }
+  .verdict button.sel-ok { background:#123d26; border-color:var(--ok); } .verdict button.sel-ko { background:#3d1212; border-color:var(--ko); }
+  code { color:var(--accent); }
+  pre { white-space:pre-wrap; font-size:12px; background:#000; padding:8px; border-radius:6px; max-height:220px; overflow:auto; }
+
+  /* Word sheet */
+  #sheet { position:fixed; inset:auto 0 0 0; max-height:70vh; overflow:auto; background:#111a1a; border-top:2px solid var(--accent); border-radius:14px 14px 0 0; padding:14px; transform:translateY(105%); transition:transform .2s; z-index:10; }
+  #sheet.open { transform:none; }
+  #chips { display:flex; flex-wrap:wrap; gap:6px; }
+  #chips button { padding:6px 9px; }
+  #wordBox { margin-top:12px; display:none; }
+  #theWord { font:28px Georgia, serif; -webkit-user-select:text; user-select:text; padding:8px; background:#000; border-radius:8px; display:inline-block; }
+</style>
+</head>
+<body>
+<h1>VN Reader — web spike</h1>
+<p class="sub">Test the risky parts of a web version on the phone. Tap the right side of the box = next / skip, left side = previous, middle = pause. <b>Long-press a word</b> = native selection.</p>
+
+<div id="reader">
+  <div id="hud"><span id="hudChapter">Demo</span><span id="hudPct">0%</span></div>
+  <div id="textBox"><div id="text"></div></div>
+  <div id="pauseIcon">⏸</div>
+  <div id="chBar"></div>
+</div>
+
+<div class="controls">
+  <button id="btnAuto">Auto ▶</button>
+  <button id="btnBionic">Bionic</button>
+  <select id="selSound" title="Sound engine">
+    <option value="webaudio">Sound: Web Audio (ogg)</option>
+    <option value="synth">Sound: Web Audio (synth)</option>
+    <option value="html">Sound: &lt;audio&gt; element</option>
+    <option value="off">Sound: off</option>
+  </select>
+  <button id="btnCpsDown">−</button><span id="cps" class="pill">40 cps</span><button id="btnCpsUp">+</button>
+  <button id="btnWords">Words</button>
+  <button id="btnWake">Keep screen on</button>
+  <button id="btnFull">Fullscreen</button>
+  <button id="btnMinimal">Minimal</button>
+</div>
+
+<!-- TEST CARDS -->
+<div class="card" data-test="audioMix">
+  <h2>1 · Sound vs Poweramp (#6) <span class="pill" data-auto></span></h2>
+  <p>Start music in Poweramp. Come back, turn on <b>Auto ▶</b> (sound on). Try each sound engine in the dropdown. Does Poweramp <b>keep playing</b> (it may duck slightly)?</p>
+  <div class="row verdict">
+    <span>Web Audio (ogg)</span><button data-v="webaudio:ok">keeps playing</button><button data-v="webaudio:ko">pauses</button>
+  </div>
+  <div class="row verdict">
+    <span>Web Audio (synth)</span><button data-v="synth:ok">keeps playing</button><button data-v="synth:ko">pauses</button>
+  </div>
+  <div class="row verdict">
+    <span>&lt;audio&gt; element</span><button data-v="html:ok">keeps playing</button><button data-v="html:ko">pauses</button>
+  </div>
+</div>
+
+<div class="card" data-test="wake">
+  <h2>2 · Keep screen on (#12) <span class="pill" data-auto></span></h2>
+  <p>Tap <b>Keep screen on</b> (no permission prompt expected), then leave the phone untouched longer than its screen timeout. In the real app this switches on by itself in auto/RSVP mode.</p>
+  <div class="row verdict"><button data-v="wake:ok">screen stayed on</button><button data-v="wake:ko">screen turned off</button><button data-v="wake:prompt">it asked a permission</button></div>
+</div>
+
+<div class="card" data-test="select">
+  <h2>3 · Word lookup (#4) <span class="pill" data-auto></span></h2>
+  <p>a) <b>Long-press</b> a word in the reader box. Does the menu show <code>french</code> / <code>english</code>?</p>
+  <div class="row verdict"><button data-v="longpress:ok">yes, apps listed</button><button data-v="longpress:ko">no apps</button><button data-v="longpress:conflict">long-press also turned the page</button></div>
+  <p>b) Tap <b>Words</b> → pick a word → the word is pre-selected. Does the menu appear (or long-press it)? Also try <i>Share</i> and <i>Google define</i>.</p>
+  <div class="row verdict"><button data-v="sheet:ok">works</button><button data-v="sheet:ko">doesn't</button><button data-v="share:ok">Share lists the apps</button></div>
+</div>
+
+<div class="card" data-test="feel">
+  <h2>4 · Reading feel <span class="pill" data-auto></span></h2>
+  <p>Auto ▶ + Bionic for ~20 sentences: does it ever stop, skip before the end, or lag? Pause (middle tap) then resume: does it continue by itself (#24)? Long sentence: does the end stay visible (#21)? Try <b>Fullscreen</b>/<b>Minimal</b> (#25).</p>
+  <div class="row verdict"><button data-v="auto:ok">auto smooth</button><button data-v="auto:ko">auto broke</button><button data-v="pause:ok">resume OK</button><button data-v="scroll:ok">long text OK</button><button data-v="full:ok">fullscreen OK</button></div>
+  <p id="cpsReal"></p>
+</div>
+
+<div class="card" data-test="epub">
+  <h2>5 · Open one of your EPUBs <span class="pill" data-auto></span></h2>
+  <p>Pick a book: it is unzipped in the browser (no upload) and its first chapters are loaded into the reader box above, split naively for now.</p>
+  <div class="row"><label class="btn">Choose EPUB<input id="fileEpub" type="file" accept=".epub,application/epub+zip" hidden></label><span id="epubInfo" class="pill"></span></div>
+</div>
+
+<div class="card" data-test="storage">
+  <h2>6 · Storage & device <span class="pill" data-auto></span></h2>
+  <pre id="envInfo">…</pre>
+  <div class="row"><button id="btnVibrate">Vibrate</button><button id="btnPersist">Ask persistent storage</button><button id="btnInstall" hidden>Install app</button></div>
+  <div class="row verdict"><button data-v="vibrate:ok">felt vibration</button><button data-v="vibrate:ko">nothing</button><button data-v="install:ok">installed / home-screen OK</button></div>
+</div>
+
+<div class="card">
+  <h2>Send results</h2>
+  <p>Copies a text report (results + browser info). Paste it back in the chat. Do it once in <b>Firefox</b> and once in <b>Chrome</b>.</p>
+  <div class="row"><button id="btnReport" class="grow">Copy report</button></div>
+  <pre id="report" hidden></pre>
+</div>
+
+<div id="sheet">
+  <div class="row" style="justify-content:space-between;margin:0 0 8px"><h2 style="margin:0">Words in this sentence</h2><button id="btnSheetClose">✕</button></div>
+  <div id="chips"></div>
+  <div id="wordBox">
+    <p style="color:var(--dim);font-size:13px">Pre-selected: long-press it if the menu didn't pop up.</p>
+    <span id="theWord"></span>
+    <div class="row"><a id="lnkGoogle" target="_blank" rel="noopener"><button>Google define</button></a><button id="btnShare">Share…</button><button id="btnCopy">Copy</button></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const results = {};          // automatic results
+const verdicts = {};         // owner's manual verdicts
+
+// ---------- Demo text (original sample covering the parser edge cases) ----------
+let book = {
+  title: 'Demo',
+  sentences: [
+    '« Tu crois vraiment qu’il viendra ? » demanda M. Bérenger en regardant la pluie.',
+    'Le commissaire haussa les épaules, alluma une cigarette, puis murmura : « Il viendra. Ils viennent toujours ! »',
+    'Sur la table traînaient des dossiers, des photos, des tasses vides, etc. et personne ne rangeait jamais rien.',
+    '“Do you think he knows?” asked J. B. Marin, without looking up from the file.',
+    'Il y eut un long silence, de ceux qui s’installent dans les vieux bureaux de police quand il est tard, que les néons grésillent, que le café a refroidi dans les gobelets en plastique et que chacun, sans oser le dire, pense à la même chose : la prochaine victime est peut-être déjà quelque part dans la ville, à attendre sans le savoir que le chuchoteur vienne la chercher, et rien de ce qui se trouve sur cette table ne permettra de l’en empêcher avant l’aube.',
+    'Dehors, un chien aboya !',
+    'Puis plus rien.',
+  ],
+};
+
+// ---------- Settings ----------
+const S = { cps: 40, bionic: false, auto: false, sound: 'webaudio', blipEvery: 2, holdBase: 900, holdPerChar: 35, wakeAuto: true };
+
+// ---------- Audio ----------
+let ctx = null, blipBuf = null, htmlPool = [], htmlIdx = 0;
+async function ensureAudio() {
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    try { blipBuf = await ctx.decodeAudioData(await (await fetch('sfx/blip_high.ogg')).arrayBuffer()); results.oggDecode = 'ok'; }
+    catch (e) { results.oggDecode = 'fail: ' + e.message; }
+    for (let i = 0; i < 4; i++) { const a = new Audio('sfx/blip_high.ogg'); a.preload = 'auto'; a.volume = .6; htmlPool.push(a); }
+  }
+  if (ctx.state === 'suspended') ctx.resume();   // may stay pending until a real tap: never await it
+}
+function blip() {
+  if (S.sound === 'off' || !ctx) return;
+  if (S.sound === 'html') { const a = htmlPool[htmlIdx++ % htmlPool.length]; a.currentTime = 0; a.play().catch(() => {}); return; }
+  const g = ctx.createGain(); g.connect(ctx.destination);
+  if (S.sound === 'webaudio' && blipBuf) {
+    g.gain.value = .6; const src = ctx.createBufferSource(); src.buffer = blipBuf; src.connect(g); src.start();
+  } else {
+    const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = 880 + Math.random() * 60;
+    g.gain.setValueAtTime(.08, ctx.currentTime); g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + .05);
+    o.connect(g); o.start(); o.stop(ctx.currentTime + .06);
+  }
+}
+
+// ---------- Reader engine: explicit state machine (prototype of the autoplay fix) ----------
+// states: 'typing' → 'holding' → (advance) ; pause freezes whichever state we are in and resumes it.
+const R = { idx: 0, chars: [], shown: 0, state: 'idle', paused: false, timer: null, holdLeft: 0, holdStart: 0, typeStart: 0 };
+const textEl = $('#text'), boxEl = $('#textBox');
+
+function render() {
+  const s = book.sentences[R.idx] || '';
+  textEl.innerHTML = '';
+  R.chars = [];
+  // Build once: one span per char, bold first half of each word in bionic mode.
+  for (const part of s.split(/(\s+)/)) {
+    const boldN = S.bionic && /\S/.test(part) ? Math.ceil(part.length / 2) : 0;
+    [...part].forEach((ch, i) => {
+      const sp = document.createElement(i < boldN ? 'b' : 'span');
+      sp.textContent = ch; sp.className = 'h'; textEl.appendChild(sp); R.chars.push(sp);
+    });
+  }
+  R.shown = 0;
+  $('#hudPct').textContent = Math.round(R.idx / Math.max(1, book.sentences.length - 1) * 100) + '%';
+  $('#chBar').style.width = (R.idx / Math.max(1, book.sentences.length - 1) * 100) + '%';
+  $('#hudChapter').textContent = book.title;
+}
+function clear() { clearTimeout(R.timer); R.timer = null; }
+function startSentence(i) {
+  clear(); R.idx = Math.max(0, Math.min(i, book.sentences.length - 1)); render();
+  R.state = 'typing'; R.typeStart = performance.now(); boxEl.scrollTop = 0;
+  if (!R.paused) tick();
+}
+function tick() {
+  if (R.paused || R.state !== 'typing') return;
+  if (R.shown < R.chars.length) {
+    const c = R.chars[R.shown++]; c.className = '';
+    if (/\S/.test(c.textContent) && R.shown % S.blipEvery === 0) blip();
+    if (R.shown % 12 === 0) boxEl.scrollTop = boxEl.scrollHeight;   // keep the typing line visible (#21)
+    R.timer = setTimeout(tick, 1000 / S.cps);
+  } else finishTyping();
+}
+function finishTyping() {
+  clear(); R.chars.forEach(c => c.className = ''); R.shown = R.chars.length;
+  boxEl.scrollTop = boxEl.scrollHeight;
+  const dt = (performance.now() - R.typeStart) / 1000;
+  if (dt > .3) $('#cpsReal').textContent = `Measured typing speed: ${(R.chars.length / dt).toFixed(1)} cps (target ${S.cps})`;
+  R.state = 'holding';
+  R.holdLeft = S.holdBase + R.chars.length * S.holdPerChar;
+  hold();
+}
+function hold() {
+  clear();
+  if (!S.auto || R.paused || R.state !== 'holding') return;
+  R.holdStart = performance.now();
+  R.timer = setTimeout(next, R.holdLeft);
+}
+function next() {
+  if (R.idx < book.sentences.length - 1) { navigator.vibrate?.(8); startSentence(R.idx + 1); }
+  else { R.state = 'done'; }
+}
+function setPaused(p) {
+  if (p === R.paused) return;
+  if (p && R.state === 'holding' && R.timer) R.holdLeft = Math.max(300, R.holdLeft - (performance.now() - R.holdStart));
+  R.paused = p; clear();
+  $('#reader').classList.toggle('paused', p);
+  if (!p) { if (R.state === 'typing') tick(); else if (R.state === 'holding') hold(); }
+}
+
+// Tap zones without overlays (so long-press selection still reaches the text).
+$('#reader').addEventListener('click', e => {
+  if (String(getSelection())) return;                 // finishing a long-press selection → not a page turn
+  ensureAudio();
+  const r = e.currentTarget.getBoundingClientRect(), x = (e.clientX - r.left) / r.width;
+  if (x > .7) { if (R.state === 'typing') finishTyping(); else { setPaused(false); next(); } }
+  else if (x < .3) { setPaused(false); startSentence(R.idx - 1); }
+  else setPaused(!R.paused);
+});
+
+// ---------- Controls ----------
+const toggle = (btn, on) => btn.classList.toggle('on', on);
+$('#btnAuto').onclick = e => { ensureAudio(); S.auto = !S.auto; toggle(e.currentTarget, S.auto); if (S.auto) { if (S.wakeAuto) wake(true); setPaused(false); if (R.state === 'holding') hold(); else if (R.state === 'done' || R.state === 'idle') startSentence(R.idx); } };
+$('#btnBionic').onclick = e => { S.bionic = !S.bionic; toggle(e.currentTarget, S.bionic); const shown = R.shown, st = R.state; render(); R.chars.slice(0, shown).forEach(c => c.className = ''); R.shown = shown; R.state = st; };
+$('#selSound').onchange = e => { S.sound = e.target.value; ensureAudio().then(blip); };
+const setCps = v => { S.cps = Math.max(5, Math.min(150, v)); $('#cps').textContent = S.cps + ' cps'; };
+$('#btnCpsDown').onclick = () => setCps(S.cps - 5);   // step 5 (#19)
+$('#btnCpsUp').onclick = () => setCps(S.cps + 5);
+
+// Wake lock (#12)
+let lock = null, wantLock = false;
+async function wake(on) {
+  wantLock = on; toggle($('#btnWake'), on);
+  try {
+    if (on && !lock) { lock = await navigator.wakeLock.request('screen'); results.wakeLock = 'acquired'; lock.addEventListener('release', () => { lock = null; }); }
+    if (!on && lock) { await lock.release(); lock = null; }
+  } catch (e) { results.wakeLock = 'error: ' + e.name + ' ' + e.message; toggle($('#btnWake'), false); }
+  setAuto('wake', results.wakeLock);
+}
+$('#btnWake').onclick = () => wake(!wantLock);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wantLock && !lock) wake(true); });
+
+// Fullscreen / minimal (#25)
+$('#btnFull').onclick = async () => {
+  try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); results.fullscreen = 'ok'; }
+  catch (e) { results.fullscreen = 'error: ' + e.message; }
+};
+$('#btnMinimal').onclick = e => toggle(e.currentTarget, document.body.classList.toggle('minimal'));
+
+// ---------- Word sheet (#4) ----------
+$('#btnWords').onclick = () => {
+  setPaused(true);
+  const words = [...new Set((book.sentences[R.idx] || '').match(/[\p{L}\p{M}’'-]+/gu) || [])];
+  $('#chips').innerHTML = '';
+  words.forEach(w => { const b = document.createElement('button'); b.textContent = w; b.onclick = () => showWord(w); $('#chips').appendChild(b); });
+  $('#wordBox').style.display = 'none'; $('#sheet').classList.add('open');
+};
+$('#btnSheetClose').onclick = () => { $('#sheet').classList.remove('open'); getSelection().removeAllRanges(); };
+function showWord(w) {
+  const clean = w.replace(/^[’'-]+|[’'-]+$/g, '');
+  $('#wordBox').style.display = 'block'; const el = $('#theWord'); el.textContent = clean;
+  $('#lnkGoogle').href = 'https://www.google.com/search?q=' + encodeURIComponent('define ' + clean);
+  const range = document.createRange(); range.selectNodeContents(el);
+  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+}
+$('#btnShare').onclick = async () => {
+  const w = $('#theWord').textContent;
+  if (!navigator.share) { results.share = 'unsupported'; return alert('Web Share not supported here'); }
+  try { await navigator.share({ text: w }); results.share = 'ok'; } catch (e) { results.share = e.name; }
+};
+$('#btnCopy').onclick = () => copyText($('#theWord').textContent);
+
+// ---------- EPUB (native unzip with DecompressionStream, no library) ----------
+async function unzip(buf) {
+  const dv = new DataView(buf), u8 = new Uint8Array(buf), dec = new TextDecoder();
+  let eocd = -1; for (let i = buf.byteLength - 22; i >= 0; i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error('not a zip');
+  const n = dv.getUint16(eocd + 10, true); let p = dv.getUint32(eocd + 16, true); const files = {};
+  for (let k = 0; k < n; k++) {
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true),
+          xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    const name = dec.decode(u8.subarray(p + 46, p + 46 + nl));
+    files[name] = async () => {
+      const start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+      const data = u8.subarray(start, start + csize);
+      if (method === 0) return data;
+      return new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+    };
+    p += 46 + nl + xl + cl;
+  }
+  return files;
+}
+$('#fileEpub').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const t0 = performance.now(); const info = $('#epubInfo'); info.textContent = 'reading…';
+  try {
+    const files = await unzip(await f.arrayBuffer()); const txt = async n => new TextDecoder().decode(await files[n]());
+    const opfPath = (await txt('META-INF/container.xml')).match(/full-path="([^"]+)"/)[1];
+    const base = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
+    const opf = new DOMParser().parseFromString(await txt(opfPath), 'application/xml');
+    const items = {}; opf.querySelectorAll('manifest > item').forEach(it => items[it.getAttribute('id')] = it.getAttribute('href'));
+    const spine = [...opf.querySelectorAll('spine > itemref')].map(r => base + decodeURIComponent(items[r.getAttribute('idref')]));
+    const title = opf.getElementsByTagNameNS('*', 'title')[0]?.textContent || f.name;
+    const sentences = [];
+    for (const href of spine) {
+      if (!files[href]) continue;
+      const doc = new DOMParser().parseFromString(await txt(href), 'application/xhtml+xml');
+      doc.querySelectorAll('p, h1, h2, h3, h4, li, blockquote').forEach(el => {
+        const t = el.textContent.replace(/\s+/g, ' ').trim(); if (!t) return;
+        // naive split for the spike — the real splitter is Phase 2
+        (t.match(/[^.!?…]+(?:[.!?…]+[»”"’)\]]*\s*|$)/g) || [t]).forEach(s => { s = s.trim(); if (s) sentences.push(s); });
+      });
+      if (sentences.length > 400) break;
+    }
+    const ms = Math.round(performance.now() - t0);
+    results.epub = `ok: "${title}" spine=${spine.length} sentences(first part)=${sentences.length} in ${ms}ms`;
+    info.textContent = `${title} · ${spine.length} files · ${ms} ms`;
+    // skip front matter: start at the first longish sentence
+    const start = Math.max(0, sentences.findIndex(s => s.length > 60));
+    book = { title, sentences: sentences.slice(start) };
+    setAuto('epub', 'ok'); startSentence(0); window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) { results.epub = 'error: ' + err.message; info.textContent = 'error: ' + err.message; setAuto('epub', 'error'); }
+};
+
+// ---------- Storage / device ----------
+async function envInfo() {
+  const lines = [];
+  const add = (k, v) => { results[k] = v; lines.push(`${k}: ${v}`); };
+  add('userAgent', navigator.userAgent);
+  add('secureContext', isSecureContext);
+  add('standalone', matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches);
+  add('wakeLockApi', 'wakeLock' in navigator);
+  add('fullscreenApi', !!document.documentElement.requestFullscreen);
+  add('vibrateApi', 'vibrate' in navigator);
+  add('shareApi', 'share' in navigator);
+  add('decompressionStream', 'DecompressionStream' in window);
+  try { add('persisted', await navigator.storage?.persisted?.()); } catch { add('persisted', 'n/a'); }
+  try { const est = await navigator.storage.estimate(); add('quota', `${(est.usage / 1e6).toFixed(1)} MB used / ${(est.quota / 1e6).toFixed(0)} MB`); } catch { add('quota', 'n/a'); }
+  try {
+    await new Promise((ok, ko) => { const r = indexedDB.open('vn-spike', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => { const tx = r.result.transaction('kv', 'readwrite'); tx.objectStore('kv').put({ t: Date.now() }, 'probe'); tx.oncomplete = ok; tx.onerror = ko; }; r.onerror = ko; });
+    add('indexedDB', 'ok');
+  } catch (e) { add('indexedDB', 'error ' + e); }
+  $('#envInfo').textContent = lines.join('\n');
+  setAuto('storage', results.indexedDB === 'ok' ? 'ok' : 'error');
+  setAuto('wake', results.wakeLockApi ? 'API present' : 'no API');
+  setAuto('select', results.shareApi ? 'share ✓' : 'no share');
+}
+$('#btnVibrate').onclick = () => { results.vibrateCall = navigator.vibrate?.([30, 60, 30]) ?? 'no api'; };
+$('#btnPersist').onclick = async () => { try { results.persistRequest = await navigator.storage.persist(); } catch (e) { results.persistRequest = 'error'; } envInfo(); };
+let installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('#btnInstall').hidden = false; });
+$('#btnInstall').onclick = async () => { if (!installEvt) return; installEvt.prompt(); results.install = (await installEvt.userChoice).outcome; };
+
+// ---------- Verdicts & report ----------
+function setAuto(test, txt) {
+  const pill = document.querySelector(`[data-test="${test}"] [data-auto]`); if (!pill) return;
+  pill.textContent = txt; pill.className = 'pill ' + (/^(ok|acquired|API present|share)/.test(txt) ? 'ok' : /error|no /.test(txt) ? 'ko' : 'warn');
+}
+document.querySelectorAll('.verdict button').forEach(b => b.onclick = () => {
+  const [k, v] = b.dataset.v.split(':'); verdicts[k] = v;
+  b.parentElement.querySelectorAll(`button[data-v^="${k}:"]`).forEach(x => x.classList.remove('sel-ok', 'sel-ko'));
+  b.classList.add(v === 'ok' ? 'sel-ok' : 'sel-ko');
+});
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; }
+  catch { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; }
+}
+$('#btnReport').onclick = async () => {
+  const rep = `VN spike report ${new Date().toISOString()}\nmanual: ${JSON.stringify(verdicts)}\nauto: ${JSON.stringify(results, null, 1)}`;
+  const pre = $('#report'); pre.hidden = false; pre.textContent = rep;
+  $('#btnReport').textContent = (await copyText(rep)) ? 'Copied ✓ — paste it in the chat' : 'Copy failed — select the text below';
+};
+
+// ---------- Boot ----------
+setCps(S.cps); envInfo(); startSentence(0);
+if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

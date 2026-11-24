@@ -1,0 +1,14 @@
+# Never commit books (copyrighted) — keep local test files here
+data/
+*.epub
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.sw?
+
+# In case tooling is added later
+node_modules/
+dist/
+.claude/settings.local.json
