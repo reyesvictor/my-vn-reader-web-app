@@ -4,6 +4,7 @@
 import * as audio from '../audio.js';
 import { keepAwake } from '../wake.js';
 import { saveState, saveDefaults } from '../store/library.js';
+import { flushAll } from '../store/db.js';
 import { FONTS, THEMES, SOUNDS } from '../settings.js';
 
 const $ = s => document.querySelector(s);
@@ -21,7 +22,7 @@ export function openReader(b, { exit }) {
   applySettings();
   show(Math.min(b.state.index || 0, b.parsed.sentences.length - 1), { instant: true });
 }
-export function closeReader() { clear(); R.phase = 'idle'; keepAwake(false); persist(); book = null; }
+export function closeReader() { closeSheets(); clear(); R.phase = 'idle'; keepAwake(false); persist(); flushAll(); book = null; }
 
 // ---------------------------------------------------------------- engine
 const sentences = () => book.parsed.sentences;
@@ -139,7 +140,7 @@ $('#stage').addEventListener('click', e => {
   else setPaused(!R.paused);
 });
 document.addEventListener('keydown', e => {
-  if (!book || !$('#settingsSheet').hidden || !$('#chaptersSheet').hidden) return;
+  if (!book || !$('#sheetBg').hidden) return;                // typing in a sheet (notes) must not turn pages
   if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); $('#stage').dispatchEvent(new MouseEvent('click', { clientX: innerWidth * 0.9 })); }
   if (e.key === 'ArrowLeft') show(R.idx - 1, { instant: true });
   if (e.key === 'p') setPaused(!R.paused);
@@ -147,6 +148,7 @@ document.addEventListener('keydown', e => {
 $('#btnAuto').onclick = () => { audio.unlock(); set('auto', !S.auto); };
 $('#btnSettings').onclick = () => { setPaused(true); openSheet('settings'); };
 $('#btnChapters').onclick = () => { setPaused(true); openSheet('chapters'); };
+$('#btnNotes').onclick = () => { setPaused(true); openSheet('notes'); };
 
 // ---------------------------------------------------------------- HUD & chapters (#8 #9)
 function chapterIndex(i) {
@@ -245,7 +247,9 @@ function renderSettings() {
   def.onclick = async () => { await saveDefaults({ ...S, auto: false }); def.textContent = 'Saved ✓'; };
   const lib = document.createElement('button'); lib.textContent = '← Library';
   lib.onclick = () => { closeSheets(); onExit(); };
-  act.append(lib, def); body.appendChild(act);
+  const notes = document.createElement('button'); notes.textContent = '✎ Notes';     // reachable in minimal display too
+  notes.onclick = () => { closeSheets(); setPaused(true); openSheet('notes'); };
+  act.append(lib, notes, def); body.appendChild(act);
 }
 
 function set(key, value) {
@@ -271,14 +275,43 @@ function applySettings() {
 }
 
 // ---------------------------------------------------------------- sheets
+const RENDER = { settings: () => renderSettings(), chapters: () => renderChapters(), notes: () => renderNotes() };
 function openSheet(which) {
-  if (which === 'settings') renderSettings(); else renderChapters();
+  RENDER[which]();
   $('#sheetBg').hidden = false; $(`#${which}Sheet`).hidden = false;
 }
 function closeSheets() {
-  $('#sheetBg').hidden = true; $('#settingsSheet').hidden = true; $('#chaptersSheet').hidden = true;
-  if (book) setPaused(false);
+  const wasOpen = !$('#sheetBg').hidden;
+  $('#sheetBg').hidden = true;
+  document.querySelectorAll('.sheet').forEach(el => { el.hidden = true; });
+  document.activeElement?.blur?.();
+  if (wasOpen) flushAll();
+  if (book && wasOpen) setPaused(false);
 }
 $('#sheetBg').onclick = closeSheets;
 document.querySelectorAll('.sheet .close').forEach(b => { b.onclick = closeSheets; });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persist(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { persist(); flushAll(); } });
+addEventListener('pagehide', () => { persist(); flushAll(); });
+
+// ---------------------------------------------------------------- notes per book (#2)
+// Free text kept in the book's state record (state.notes), which survives removing the book (#32).
+const notesEl = $('#notesText'), notesStatus = $('#notesStatus');
+function renderNotes() {
+  notesEl.value = book.state.notes || '';
+  notesStatus.textContent = '';
+}
+notesEl.addEventListener('input', () => {
+  book.state.notes = notesEl.value;
+  persist();                                    // debounced write (db.putSoon), flushed on close / page hide
+  notesStatus.textContent = 'saved';
+});
+$('#btnQuote').onclick = () => {
+  const ch = book.parsed.chapters[chapterIndex(R.idx)]?.title;
+  const quote = `> ${sentences()[R.idx]}${ch && ch !== '—' ? ` (${ch})` : ''}\n`;
+  const v = notesEl.value, at = notesEl.selectionStart ?? v.length;
+  const before = v.slice(0, at), lead = before && !before.endsWith('\n') ? '\n' : '';
+  notesEl.value = before + lead + quote + v.slice(at);
+  notesEl.dispatchEvent(new Event('input'));
+  notesEl.focus();
+  notesEl.selectionStart = notesEl.selectionEnd = (before + lead + quote).length;
+};

@@ -30,6 +30,7 @@
   <div class="hud top">
     <button id="btnChapters" class="icon hide-minimal" title="Chapters">☰</button>
     <div id="hudTitle" class="hud-title hide-minimal"></div>
+    <button id="btnNotes" class="icon hide-minimal" title="Notes">✎</button>
     <button id="btnAuto" class="icon hide-minimal" title="Auto mode">▶</button>
     <button id="btnSettings" class="icon" title="Settings">⚙</button>
   </div>
@@ -52,6 +53,12 @@
 <div id="chaptersSheet" class="sheet" hidden>
   <div class="sheet-head"><h2>Chapters</h2><button class="icon close">✕</button></div>
   <ol id="chapterList" class="chapter-list"></ol>
+</div>
+
+<div id="notesSheet" class="sheet" hidden>
+  <div class="sheet-head"><h2>Notes</h2><button class="icon close">✕</button></div>
+  <textarea id="notesText" spellcheck="true" placeholder="Characters, places, who is who…"></textarea>
+  <div class="actions notes-actions"><button id="btnQuote">+ Quote current sentence</button><span id="notesStatus"></span></div>
 </div>
 
 <script type="module" src="js/main.js"></script>

@@ -98,3 +98,9 @@ body.minimal .hide-minimal { visibility:hidden; }
 .chapter-list li.read { opacity:.55; }
 .chapter-list li.current { border-left:3px solid var(--accent); padding-left:10px; opacity:1; }
 .chapter-list li .bar { margin-top:6px; }
+
+/* Notes (#2) */
+#notesText { display:block; width:100%; height:min(46vh, 420px); resize:vertical; background:var(--bg); color:var(--fg); border:1px solid var(--line);
+  border-radius:8px; padding:10px; font:15px/1.45 var(--read-font); }
+.notes-actions { align-items:center; justify-content:space-between; margin-top:10px; }
+#notesStatus { color:var(--dim); font-size:12px; }

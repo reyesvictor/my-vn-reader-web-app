@@ -38,8 +38,15 @@ export async function bookId(buffer) {
 }
 
 // Debounced progress writes (a sentence change every second must not hammer the disk).
-const timers = {};
+// flushAll() writes whatever is still waiting — call it when the page is hidden so nothing typed is lost.
+const pending = new Map();
 export function putSoon(store, key, value, ms = 800) {
-  clearTimeout(timers[store + key]);
-  timers[store + key] = setTimeout(() => put(store, key, value), ms);
+  const k = store + '\u0000' + key, p = pending.get(k);
+  if (p) clearTimeout(p.timer);
+  pending.set(k, { store, key, value, timer: setTimeout(() => { pending.delete(k); put(store, key, value); }, ms) });
+}
+export function flushAll() {
+  const jobs = [...pending.values()].map(p => { clearTimeout(p.timer); return put(p.store, p.key, p.value); });
+  pending.clear();
+  return Promise.all(jobs);
 }
