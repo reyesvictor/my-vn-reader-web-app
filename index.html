@@ -30,6 +30,7 @@
   <div class="hud top">
     <button id="btnChapters" class="icon hide-minimal" title="Chapters">☰</button>
     <div id="hudTitle" class="hud-title hide-minimal"></div>
+    <button id="btnWords" class="icon hide-minimal" title="Look up a word">⌕</button>
     <button id="btnNotes" class="icon hide-minimal" title="Notes">✎</button>
     <button id="btnAuto" class="icon hide-minimal" title="Auto mode">▶</button>
     <button id="btnSettings" class="icon" title="Settings">⚙</button>
@@ -55,6 +56,23 @@
   <ol id="chapterList" class="chapter-list"></ol>
 </div>
 
+<div id="wordsSheet" class="sheet" hidden>
+  <div class="sheet-head"><h2>Words</h2><button class="icon close">✕</button></div>
+  <div id="wordPick">
+    <p id="wordSentence" class="selectable"></p>
+    <div id="wordList" class="word-list"></div>
+  </div>
+  <div id="wordDetail" hidden>
+    <button id="wordBack">← All words</button>
+    <div id="wordBig" class="selectable" lang="fr"></div>
+    <p class="word-hint">Long-press the word for the french / english apps.</p>
+    <div class="actions">
+      <a id="wordDefine" class="btn" target="_blank" rel="noopener">Define (Google)</a>
+      <button id="wordShare">Share</button>
+      <button id="wordCopy">Copy</button>
+    </div>
+  </div>
+</div>
 <div id="notesSheet" class="sheet" hidden>
   <div class="sheet-head"><h2>Notes</h2><button class="icon close">✕</button></div>
   <textarea id="notesText" spellcheck="true" placeholder="Characters, places, who is who…"></textarea>

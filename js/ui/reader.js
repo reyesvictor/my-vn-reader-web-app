@@ -131,8 +131,17 @@ function updateWake() { keepAwake(!!book && S.keepAwake && (S.auto || S.rsvp) &&
 function persist() { if (book) saveState(book.id, { ...book.state, index: R.idx, settings: S }); }
 
 // ---------------------------------------------------------------- input
+// Long-press selects a word (Android's menu then offers the french / english apps, #4). A selection must never
+// turn the page: neither the long-press itself nor the tap that dismisses the selection afterwards.
+let selAtDown = false;
+$('#stage').addEventListener('pointerdown', () => { selAtDown = !getSelection().isCollapsed; });
+document.addEventListener('selectionchange', () => {
+  const sel = getSelection();
+  if (book && !R.paused && !sel.isCollapsed && textEl.contains(sel.anchorNode)) setPaused(true);   // auto mode waits
+});
 $('#stage').addEventListener('click', e => {
-  if (!book || String(getSelection())) return;      // long-press selection (word lookup #4) is not a page turn
+  if (!book) return;
+  if (selAtDown || !getSelection().isCollapsed) { selAtDown = false; return; }
   audio.unlock();
   const x = e.clientX / window.innerWidth;
   if (x > 0.7) { if (R.phase === 'typing') finishTyping(); else { setPaused(false); next(); } }
@@ -149,6 +158,7 @@ $('#btnAuto').onclick = () => { audio.unlock(); set('auto', !S.auto); };
 $('#btnSettings').onclick = () => { setPaused(true); openSheet('settings'); };
 $('#btnChapters').onclick = () => { setPaused(true); openSheet('chapters'); };
 $('#btnNotes').onclick = () => { setPaused(true); openSheet('notes'); };
+$('#btnWords').onclick = () => { setPaused(true); openSheet('words'); };
 
 // ---------------------------------------------------------------- HUD & chapters (#8 #9)
 function chapterIndex(i) {
@@ -275,7 +285,7 @@ function applySettings() {
 }
 
 // ---------------------------------------------------------------- sheets
-const RENDER = { settings: () => renderSettings(), chapters: () => renderChapters(), notes: () => renderNotes() };
+const RENDER = { settings: () => renderSettings(), chapters: () => renderChapters(), notes: () => renderNotes(), words: () => renderWords() };
 function openSheet(which) {
   RENDER[which]();
   $('#sheetBg').hidden = false; $(`#${which}Sheet`).hidden = false;
@@ -285,6 +295,8 @@ function closeSheets() {
   $('#sheetBg').hidden = true;
   document.querySelectorAll('.sheet').forEach(el => { el.hidden = true; });
   document.activeElement?.blur?.();
+  const sel = getSelection();
+  if (!sel.isCollapsed && !textEl.contains(sel.anchorNode)) sel.removeAllRanges();   // or the next tap is swallowed
   if (wasOpen) flushAll();
   if (book && wasOpen) setPaused(false);
 }
@@ -314,4 +326,47 @@ $('#btnQuote').onclick = () => {
   notesEl.dispatchEvent(new Event('input'));
   notesEl.focus();
   notesEl.selectionStart = notesEl.selectionEnd = (before + lead + quote).length;
+};
+
+// ---------------------------------------------------------------- word lookup (#4)
+// No dictionary plumbing: the owner's `french` / `english` apps sit in Android's text-selection menu, so the sheet
+// just shows each word big and already selected. Plus Google define, Share and Copy.
+const ELISION = /^(?:l|d|j|m|n|s|t|c|qu|jusqu|lorsqu|puisqu|quoiqu)['’](.+)$/i;
+const CLITIC = new Set(['t', 'il', 'ils', 'elle', 'elles', 'on', 'je', 'tu', 'nous', 'vous', 'moi', 'toi', 'lui', 'le', 'la', 'les', 'leur', 'y', 'en', 'ce']);
+function wordsOf(text) {
+  const seen = new Set(), out = [];
+  for (let w of text.match(/[\p{L}\p{M}\p{N}]+(?:[-'’][\p{L}\p{M}\p{N}]+)*/gu) || []) {
+    w = w.replace(ELISION, '$1');                           // l’homme → homme, qu’il → il
+    const parts = w.split('-');
+    if (parts.length > 1 && parts.slice(1).some(p => CLITIC.has(p.toLowerCase()))) w = parts[0];   // demanda-t-il → demanda
+    if (w.length < 2 || /^\p{N}+$/u.test(w) || seen.has(w.toLowerCase())) continue;
+    seen.add(w.toLowerCase()); out.push(w);
+  }
+  return out;
+}
+function renderWords() {
+  const text = sentences()[R.idx] || '';
+  $('#wordSentence').textContent = text;
+  const list = $('#wordList'); list.innerHTML = '';
+  for (const w of wordsOf(text)) {
+    const b = document.createElement('button'); b.textContent = w;
+    b.onclick = () => showWord(w);
+    list.appendChild(b);
+  }
+  $('#wordPick').hidden = false; $('#wordDetail').hidden = true;
+}
+function showWord(w) {
+  $('#wordPick').hidden = true; $('#wordDetail').hidden = false;
+  const big = $('#wordBig'); big.textContent = w;
+  $('#wordDefine').href = 'https://www.google.com/search?q=define+' + encodeURIComponent(w);
+  $('#wordShare').hidden = !navigator.share;
+  $('#wordCopy').textContent = 'Copy';
+  const range = document.createRange(); range.selectNodeContents(big);      // pre-selected → selection menu
+  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+}
+$('#wordBack').onclick = () => { getSelection().removeAllRanges(); $('#wordPick').hidden = false; $('#wordDetail').hidden = true; };
+$('#wordShare').onclick = () => navigator.share?.({ text: $('#wordBig').textContent }).catch(() => {});
+$('#wordCopy').onclick = async () => {
+  try { await navigator.clipboard.writeText($('#wordBig').textContent); $('#wordCopy').textContent = 'Copied ✓'; }
+  catch { $('#wordCopy').textContent = 'Copy failed'; }
 };
