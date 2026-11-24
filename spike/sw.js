@@ -1,6 +1,7 @@
 // Minimal offline cache so the spike can be "installed" and tested offline.
-const CACHE = 'vn-spike-v1';
-const FILES = ['./', './index.html', './manifest.webmanifest', './sfx/blip_high.ogg', './icon-192.png', './icon-512.png'];
+const CACHE = 'vn-spike-v2';
+const FILES = ['./', './index.html', './manifest.webmanifest', './sfx/blip_high.ogg', './icon-192.png', './icon-512.png',
+  '../fonts/CourierPrime-Regular.ttf', '../fonts/CourierPrime-Bold.ttf', '../fonts/CourierPrime-Italic.ttf', '../fonts/Monocraft.ttf', '../fonts/Monocraft-Bold.ttf'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

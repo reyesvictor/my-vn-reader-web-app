@@ -8,7 +8,12 @@
 <link rel="icon" href="icon-192.png">
 <title>VN Reader — web spike</title>
 <style>
-  :root { --bg:#0a0a0a; --fg:#d8f7f7; --accent:#00e5e5; --dim:#6b7f80; --card:#141818; --ok:#3ddc84; --ko:#ff5c5c; --warn:#ffb000; }
+  @font-face { font-family:'Courier Prime'; src:url(../fonts/CourierPrime-Regular.ttf); font-display:swap; }
+  @font-face { font-family:'Courier Prime'; src:url(../fonts/CourierPrime-Bold.ttf); font-weight:700; font-display:swap; }
+  @font-face { font-family:'Courier Prime'; src:url(../fonts/CourierPrime-Italic.ttf); font-style:italic; font-display:swap; }
+  @font-face { font-family:'Monocraft'; src:url(../fonts/Monocraft.ttf); font-display:swap; }
+  @font-face { font-family:'Monocraft'; src:url(../fonts/Monocraft-Bold.ttf); font-weight:700; font-display:swap; }
+  :root { --read-font:'Courier Prime', 'Courier New', monospace; --read-size:24px; --read-lh:1.5; --read-align:left; --ui-font:'Monocraft', monospace; --bg:#0a0a0a; --fg:#d8f7f7; --accent:#00e5e5; --dim:#6b7f80; --card:#141818; --ok:#3ddc84; --ko:#ff5c5c; --warn:#ffb000; }
   * { box-sizing: border-box; }
   html, body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.45 system-ui, sans-serif; }
   body { padding: env(safe-area-inset-top) 0 40px; }
@@ -18,9 +23,9 @@
 
   /* Reader demo */
   #reader { position:relative; height:52vh; margin:0 10px; border:1px solid #233; border-radius:10px; background:#060909; overflow:hidden; }
-  #hud { position:absolute; top:6px; left:10px; right:10px; display:flex; justify-content:space-between; font-size:11px; color:var(--dim); pointer-events:none; }
+  #hud { position:absolute; top:6px; left:10px; right:10px; display:flex; justify-content:space-between; font:11px var(--ui-font); color:var(--dim); pointer-events:none; }
   #textBox { position:absolute; inset:26px 14px 12px; overflow-y:auto; display:flex; flex-direction:column; }
-  #text { margin:auto 0; font:21px/1.55 Georgia, serif; white-space:pre-wrap; -webkit-user-select:text; user-select:text; }
+  #text { margin:auto 0; font-family:var(--read-font); font-size:var(--read-size); line-height:var(--read-lh); text-align:var(--read-align); white-space:pre-wrap; -webkit-user-select:text; user-select:text; }
   #text .h { visibility:hidden; }            /* not yet typed: keeps layout stable */
   #text b { font-weight:700; }
   #pauseIcon { position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-size:64px; opacity:.25; pointer-events:none; }
@@ -29,7 +34,8 @@
   body.minimal #hud, body.minimal #chBar { display:none; }
 
   .controls { display:flex; flex-wrap:wrap; gap:6px; margin:8px 10px; }
-  button, select, label.btn { background:#1d2626; color:var(--fg); border:1px solid #2d3a3a; border-radius:8px; padding:8px 10px; font-size:14px; }
+  button, select, label.btn { background:#1d2626; color:var(--fg); border:1px solid #2d3a3a; border-radius:8px; padding:8px 10px; font:13px var(--ui-font); }
+  .pill { font-family:var(--ui-font); }
   button.on { background:#004d4d; border-color:var(--accent); }
   .grow { flex:1; }
 
@@ -73,7 +79,9 @@
     <option value="html">Sound: &lt;audio&gt; element</option>
     <option value="off">Sound: off</option>
   </select>
-  <button id="btnCpsDown">−</button><span id="cps" class="pill">40 cps</span><button id="btnCpsUp">+</button>
+  <button id="btnCpsDown">−</button><span id="cps" class="pill">25 cps</span><button id="btnCpsUp">+</button>
+  <button id="btnSizeDown">A−</button><span id="size" class="pill">24px</span><button id="btnSizeUp">A+</button>
+  <button id="btnFont">Font</button>
   <button id="btnWords">Words</button>
   <button id="btnWake">Keep screen on</button>
   <button id="btnFull">Fullscreen</button>
@@ -167,7 +175,20 @@ let book = {
 };
 
 // ---------- Settings ----------
-const S = { cps: 40, bionic: false, auto: false, sound: 'webaudio', blipEvery: 2, holdBase: 900, holdPerChar: 35, wakeAuto: true };
+const DEFAULTS = { cps: 25, fontSize: 24, lineHeight: 1.5, font: 'Courier Prime', align: 'left', bionic: false, sound: 'webaudio', blipEvery: 2, holdBase: 900, holdPerChar: 35, wakeAuto: true };
+const FONTS = { 'Courier Prime': "'Courier Prime', 'Courier New', monospace", 'Monocraft': "'Monocraft', monospace", 'Serif': 'Georgia, serif' };
+const S = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('vn-spike-settings') || '{}'), auto: false };
+const save = () => { const { auto, ...keep } = S; localStorage.setItem('vn-spike-settings', JSON.stringify(keep)); };
+function applyLook() {
+  const st = document.documentElement.style;
+  st.setProperty('--read-font', FONTS[S.font] || FONTS['Courier Prime']);
+  st.setProperty('--read-size', S.fontSize + 'px');
+  st.setProperty('--read-lh', S.lineHeight);
+  st.setProperty('--read-align', S.align);
+  $('#size').textContent = S.fontSize + 'px'; $('#btnFont').textContent = 'Font: ' + S.font;
+  toggle($('#btnBionic'), S.bionic); $('#selSound').value = S.sound;
+  save();
+}
 
 // ---------- Audio ----------
 let ctx = null, blipBuf = null, htmlPool = [], htmlIdx = 0;
@@ -270,9 +291,12 @@ $('#reader').addEventListener('click', e => {
 // ---------- Controls ----------
 const toggle = (btn, on) => btn.classList.toggle('on', on);
 $('#btnAuto').onclick = e => { ensureAudio(); S.auto = !S.auto; toggle(e.currentTarget, S.auto); if (S.auto) { if (S.wakeAuto) wake(true); setPaused(false); if (R.state === 'holding') hold(); else if (R.state === 'done' || R.state === 'idle') startSentence(R.idx); } };
-$('#btnBionic').onclick = e => { S.bionic = !S.bionic; toggle(e.currentTarget, S.bionic); const shown = R.shown, st = R.state; render(); R.chars.slice(0, shown).forEach(c => c.className = ''); R.shown = shown; R.state = st; };
-$('#selSound').onchange = e => { S.sound = e.target.value; ensureAudio().then(blip); };
-const setCps = v => { S.cps = Math.max(5, Math.min(150, v)); $('#cps').textContent = S.cps + ' cps'; };
+$('#btnBionic').onclick = e => { S.bionic = !S.bionic; toggle(e.currentTarget, S.bionic); save(); const shown = R.shown, st = R.state; render(); R.chars.slice(0, shown).forEach(c => c.className = ''); R.shown = shown; R.state = st; };
+$('#selSound').onchange = e => { S.sound = e.target.value; save(); ensureAudio().then(blip); };
+const setCps = v => { S.cps = Math.max(5, Math.min(150, v)); $('#cps').textContent = S.cps + ' cps'; save(); };
+$('#btnSizeDown').onclick = () => { S.fontSize = Math.max(14, S.fontSize - 2); applyLook(); };
+$('#btnSizeUp').onclick = () => { S.fontSize = Math.min(44, S.fontSize + 2); applyLook(); };
+$('#btnFont').onclick = () => { const k = Object.keys(FONTS); S.font = k[(k.indexOf(S.font) + 1) % k.length]; applyLook(); };
 $('#btnCpsDown').onclick = () => setCps(S.cps - 5);   // step 5 (#19)
 $('#btnCpsUp').onclick = () => setCps(S.cps + 5);
 
@@ -422,7 +446,7 @@ $('#btnReport').onclick = async () => {
 };
 
 // ---------- Boot ----------
-setCps(S.cps); envInfo(); startSentence(0);
+applyLook(); setCps(S.cps); envInfo(); startSentence(0);
 if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
