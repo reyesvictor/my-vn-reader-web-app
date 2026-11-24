@@ -29,6 +29,7 @@
   <div id="snow" aria-hidden="true"></div>
   <div class="hud top">
     <button id="btnChapters" class="icon hide-minimal" title="Chapters">☰</button>
+    <button id="btnGallery" class="icon hide-minimal" title="Images" hidden>▦</button>
     <div id="hudTitle" class="hud-title hide-minimal"></div>
     <button id="btnWords" class="icon hide-minimal" title="Look up a word">⌕</button>
     <button id="btnNotes" class="icon hide-minimal" title="Notes">✎</button>
@@ -36,7 +37,7 @@
     <button id="btnSettings" class="icon" title="Settings">⚙</button>
   </div>
   <div id="stage">
-    <div id="textBox"><div id="text" lang="fr"></div></div>
+    <div id="textBox"><div id="pics"></div><div id="text" lang="fr"></div></div>
   </div>
   <div id="pauseMark" aria-hidden="true">❚❚</div>
   <div class="hud bottom hide-minimal">
@@ -56,6 +57,15 @@
   <ol id="chapterList" class="chapter-list"></ol>
 </div>
 
+<div id="gallerySheet" class="sheet" hidden>
+  <div class="sheet-head"><h2>Images</h2><button class="icon close">✕</button></div>
+  <div id="galleryBody"></div>
+</div>
+<div id="viewer" hidden>
+  <div class="viewer-bar"><button id="viewerBack" class="icon" title="Back">←</button><span id="viewerCaption"></span>
+    <button id="viewerGo" title="Go to this place in the book">Go to</button><button id="viewerClose" class="icon" title="Close">✕</button></div>
+  <img id="viewerImg" alt="">
+</div>
 <div id="wordsSheet" class="sheet" hidden>
   <div class="sheet-head"><h2>Words</h2><button class="icon close">✕</button></div>
   <div id="wordPick">

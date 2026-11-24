@@ -115,3 +115,16 @@ body.minimal .hide-minimal { visibility:hidden; }
 #wordDetail .actions { justify-content:center; }
 a.btn { text-decoration:none; }
 #btnWords { font-size:24px; padding-top:7px; }
+
+/* Images (#27): inline above the sentence they precede, gallery, full-screen viewer */
+#pics:not(:empty) { margin-top:auto; padding-top:8px; }
+#pics:not(:empty) + #text { margin-top:0; }
+#pics img { display:block; max-width:100%; max-height:42vh; margin:0 auto 10px; border-radius:4px; cursor:zoom-in; }
+#galleryBody h3 { font-family:Georgia, serif; text-transform:none; letter-spacing:0; font-size:14px; color:var(--fg); }
+.gallery-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(96px, 1fr)); gap:8px; }
+.gallery-grid img { width:100%; aspect-ratio:3/4; object-fit:contain; border-radius:6px; border:1px solid var(--line); background:var(--bg); cursor:zoom-in; }
+#viewer { position:fixed; inset:0; z-index:20; background:#000; display:flex; flex-direction:column; }
+.viewer-bar { display:flex; align-items:center; gap:4px; padding:calc(env(safe-area-inset-top) + 2px) 4px 2px; color:#ddd; }
+.viewer-bar button.icon { color:#ddd; }
+#viewerCaption { flex:1; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.75; }
+#viewerImg { flex:1; min-height:0; width:100%; object-fit:contain; padding-bottom:env(safe-area-inset-bottom); }

@@ -1,7 +1,7 @@
 // Offline cache for the app shell. Network first, so a new deploy shows up on the next load.
-const CACHE = 'vn-reader-v1';
+const CACHE = 'vn-reader-v2';
 const SHELL = ['./', 'index.html', 'css/app.css', 'manifest.webmanifest', 'js/main.js', 'js/settings.js', 'js/audio.js', 'js/wake.js',
-  'js/core/zip.js', 'js/core/splitter.js', 'js/core/epub.js', 'js/store/db.js', 'js/store/library.js', 'js/ui/reader.js',
+  'js/core/zip.js', 'js/core/splitter.js', 'js/core/epub.js', 'js/core/assets.js', 'js/store/db.js', 'js/store/library.js', 'js/ui/reader.js',
   'sfx/blip_high.ogg', 'icons/icon-192.png', 'fonts/CourierPrime-Regular.ttf', 'fonts/CourierPrime-Bold.ttf',
   'fonts/CourierPrime-Italic.ttf', 'fonts/Monocraft.ttf', 'fonts/Monocraft-Bold.ttf'];
 

@@ -5,6 +5,7 @@ import * as audio from '../audio.js';
 import { keepAwake } from '../wake.js';
 import { saveState, saveDefaults } from '../store/library.js';
 import { flushAll } from '../store/db.js';
+import { openAssets, closeAssets, assetUrl } from '../core/assets.js';
 import { FONTS, THEMES, SOUNDS } from '../settings.js';
 
 const $ = s => document.querySelector(s);
@@ -19,10 +20,12 @@ let onExit = () => {};
 export function openReader(b, { exit }) {
   book = b; S = b.state.settings; onExit = exit;
   R.paused = false; readerEl.classList.remove('paused');
+  openAssets(b.id);
+  indexImages();
   applySettings();
   show(Math.min(b.state.index || 0, b.parsed.sentences.length - 1), { instant: true });
 }
-export function closeReader() { closeSheets(); clear(); R.phase = 'idle'; keepAwake(false); persist(); flushAll(); book = null; }
+export function closeReader() { closeViewer(); closeSheets(); clear(); R.phase = 'idle'; keepAwake(false); persist(); flushAll(); closeAssets(); book = null; }
 
 // ---------------------------------------------------------------- engine
 const sentences = () => book.parsed.sentences;
@@ -34,6 +37,7 @@ function show(i, { instant = false } = {}) {
   const text = sentences()[R.idx] || '';
   const heading = book.parsed.headings.includes(R.idx);
   textEl.className = heading ? 'heading' : '';
+  showPics(R.idx);
   boxEl.scrollTop = 0;
   updateHud();
   persist();
@@ -98,7 +102,7 @@ function finishTyping() {
   R.chars.forEach(c => { c.className = ''; });
   R.shown = R.chars.length;
   R.phase = 'holding';
-  R.holdLeft = S.autoBase + (S.rsvp ? 0 : sentences()[R.idx].length * S.autoPerChar);
+  R.holdLeft = S.autoBase + (S.rsvp ? 0 : sentences()[R.idx].length * S.autoPerChar) + (picsAt.has(R.idx) ? 2500 : 0);
   hold();
 }
 
@@ -149,7 +153,9 @@ $('#stage').addEventListener('click', e => {
   else setPaused(!R.paused);
 });
 document.addEventListener('keydown', e => {
-  if (!book || !$('#sheetBg').hidden) return;                // typing in a sheet (notes) must not turn pages
+  if (!book) return;
+  if (!$('#viewer').hidden) { if (e.key === 'Escape') closeViewer(); return; }
+  if (!$('#sheetBg').hidden) return;                          // typing in a sheet (notes) must not turn pages
   if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); $('#stage').dispatchEvent(new MouseEvent('click', { clientX: innerWidth * 0.9 })); }
   if (e.key === 'ArrowLeft') show(R.idx - 1, { instant: true });
   if (e.key === 'p') setPaused(!R.paused);
@@ -158,6 +164,7 @@ $('#btnAuto').onclick = () => { audio.unlock(); set('auto', !S.auto); };
 $('#btnSettings').onclick = () => { setPaused(true); openSheet('settings'); };
 $('#btnChapters').onclick = () => { setPaused(true); openSheet('chapters'); };
 $('#btnNotes').onclick = () => { setPaused(true); openSheet('notes'); };
+$('#btnGallery').onclick = () => { setPaused(true); openSheet('gallery'); };
 $('#btnWords').onclick = () => { setPaused(true); openSheet('words'); };
 
 // ---------------------------------------------------------------- HUD & chapters (#8 #9)
@@ -285,7 +292,7 @@ function applySettings() {
 }
 
 // ---------------------------------------------------------------- sheets
-const RENDER = { settings: () => renderSettings(), chapters: () => renderChapters(), notes: () => renderNotes(), words: () => renderWords() };
+const RENDER = { settings: () => renderSettings(), chapters: () => renderChapters(), notes: () => renderNotes(), words: () => renderWords(), gallery: () => renderGallery() };
 function openSheet(which) {
   RENDER[which]();
   $('#sheetBg').hidden = false; $(`#${which}Sheet`).hidden = false;
@@ -369,4 +376,75 @@ $('#wordShare').onclick = () => navigator.share?.({ text: $('#wordBig').textCont
 $('#wordCopy').onclick = async () => {
   try { await navigator.clipboard.writeText($('#wordBig').textContent); $('#wordCopy').textContent = 'Copied ✓'; }
   catch { $('#wordCopy').textContent = 'Copy failed'; }
+};
+
+// ---------------------------------------------------------------- images (#27)
+// parsed.images = [{ at, path, alt }]: the image comes right before sentence `at` (at === length → after the last one).
+let picsAt = new Map();          // sentence index → images shown above it
+function indexImages() {
+  picsAt = new Map();
+  const last = sentences().length - 1;
+  for (const img of book.parsed.images || []) {
+    const at = Math.min(img.at, last);
+    if (!picsAt.has(at)) picsAt.set(at, []);
+    picsAt.get(at).push(img);
+  }
+  $('#btnGallery').hidden = !uniqueImages().length;
+}
+const uniqueImages = () => (book.parsed.images || []).filter((im, i, a) => a.findIndex(x => x.path === im.path) === i);
+
+function showPics(i) {
+  const box = $('#pics'); box.innerHTML = '';
+  for (const img of picsAt.get(i) || []) {
+    const el = document.createElement('img'); el.alt = img.alt || '';
+    el.onclick = e => { e.stopPropagation(); openViewer(img, { inline: true }); };
+    assetUrl(img.path).then(u => { if (u) el.src = u; else el.remove(); });
+    box.appendChild(el);
+  }
+}
+
+function renderGallery() {
+  const body = $('#galleryBody'); body.innerHTML = '';
+  const ch = book.parsed.chapters, last = sentences().length - 1;
+  let grid = null, curCh = -1;
+  for (const img of uniqueImages()) {
+    const ci = chapterIndex(Math.min(img.at, last));
+    if (ci !== curCh) {
+      curCh = ci;
+      const h = document.createElement('h3'); h.textContent = ch[ci]?.title === '—' ? 'Start' : ch[ci]?.title || '';
+      grid = document.createElement('div'); grid.className = 'gallery-grid';
+      body.append(h, grid);
+    }
+    const el = document.createElement('img'); el.alt = img.alt || ''; el.loading = 'lazy';
+    el.onclick = () => openViewer(img);
+    assetUrl(img.path).then(u => { if (u) el.src = u; });
+    grid.appendChild(el);
+  }
+}
+
+// Full-screen viewer. It pushes a history entry so the phone's back button closes it (and not the reader).
+let viewing = null;              // { img, resume }
+async function openViewer(img, { inline = false } = {}) {
+  const resume = inline && !R.paused;
+  if (inline) setPaused(true);
+  viewing = { img, resume };
+  const ci = chapterIndex(Math.min(img.at, sentences().length - 1));
+  $('#viewerCaption').textContent = [book.parsed.chapters[ci]?.title, img.alt].filter(t => t && t !== '—' && !/^(image|img|cover|logo)$/i.test(t)).join(' · ');
+  $('#viewerGo').hidden = inline;
+  $('#viewerImg').src = (await assetUrl(img.path)) || '';
+  $('#viewer').hidden = false;
+  history.pushState({ viewer: true }, '');
+}
+function closeViewer({ fromHistory = false } = {}) {
+  if (!viewing) return;
+  const { resume } = viewing; viewing = null;
+  $('#viewer').hidden = true; $('#viewerImg').removeAttribute('src');
+  if (!fromHistory && history.state?.viewer) history.back();
+  if (resume && book) setPaused(false);
+}
+addEventListener('popstate', () => { if (viewing) closeViewer({ fromHistory: true }); });
+$('#viewerBack').onclick = $('#viewerClose').onclick = () => closeViewer();
+$('#viewerGo').onclick = () => {
+  const at = Math.min(viewing.img.at, sentences().length - 1);
+  closeViewer(); closeSheets(); show(at, { instant: true });
 };
