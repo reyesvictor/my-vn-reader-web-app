@@ -2,16 +2,58 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/app.css">
 <title>VN Reader</title>
-<style>
-  body { margin:0; min-height:100vh; display:grid; place-content:center; gap:16px; background:#0a0a0a; color:#d8f7f7; font:16px system-ui, sans-serif; text-align:center; }
-  a { color:#00e5e5; font-size:20px; }
-</style>
 </head>
-<body>
-  <h1>VN Reader</h1>
-  <p>The app is coming. For now:</p>
-  <a href="spike/">→ Feasibility test page</a>
+<body data-theme="Cyber">
+
+<!-- LIBRARY -->
+<section id="library" class="view" hidden>
+  <header class="lib-head">
+    <h1>VN Library</h1>
+    <label class="btn primary">+ Import EPUB<input id="fileInput" type="file" accept=".epub,application/epub+zip" multiple hidden></label>
+  </header>
+  <p id="libStatus" class="lib-status"></p>
+  <div id="continue"></div>
+  <ul id="bookList" class="book-list"></ul>
+  <p class="lib-foot">Books stay on this phone (nothing is uploaded). Removing a book keeps its progress and
+    settings: import the same file again to get them back.</p>
+</section>
+
+<!-- READER -->
+<section id="reader" class="view" hidden>
+  <div id="snow" aria-hidden="true"></div>
+  <div class="hud top">
+    <button id="btnChapters" class="icon hide-minimal" title="Chapters">☰</button>
+    <div id="hudTitle" class="hud-title hide-minimal"></div>
+    <button id="btnAuto" class="icon hide-minimal" title="Auto mode">▶</button>
+    <button id="btnSettings" class="icon" title="Settings">⚙</button>
+  </div>
+  <div id="stage">
+    <div id="textBox"><div id="text" lang="fr"></div></div>
+  </div>
+  <div id="pauseMark" aria-hidden="true">❚❚</div>
+  <div class="hud bottom hide-minimal">
+    <span id="pct"></span>
+    <div id="chBar"><div></div></div>
+  </div>
+</section>
+
+<!-- SHEETS -->
+<div id="sheetBg" hidden></div>
+<div id="settingsSheet" class="sheet" hidden>
+  <div class="sheet-head"><h2>Settings</h2><button class="icon close">✕</button></div>
+  <div id="settingsBody"></div>
+</div>
+<div id="chaptersSheet" class="sheet" hidden>
+  <div class="sheet-head"><h2>Chapters</h2><button class="icon close">✕</button></div>
+  <ol id="chapterList" class="chapter-list"></ol>
+</div>
+
+<script type="module" src="js/main.js"></script>
 </body>
 </html>

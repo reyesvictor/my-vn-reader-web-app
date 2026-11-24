@@ -1,0 +1,9 @@
+{
+  "name": "my-vn-reader-web-app",
+  "private": true,
+  "type": "module",
+  "description": "No dependencies, no build. package.json only exists so node runs the ES-module tests.",
+  "scripts": {
+    "test": "node tests/splitter.test.js"
+  }
+}
