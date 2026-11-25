@@ -18,6 +18,7 @@ export const DEFAULTS = {
   blipEvery: 2,
   keepAwake: true,       // keep the screen on while auto/RSVP runs (#12)
   minimal: false,        // minimal display (#25)
+  fullscreen: false,     // full screen while reading (needs a tap to enter: browser rule)
 };
 
 export const THEMES = ['Cyber', 'Dark', 'Light', 'Snow', 'Amber', 'Detective', 'VHS'];

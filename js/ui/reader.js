@@ -26,7 +26,7 @@ export function openReader(b, { exit }) {
   applySettings();
   show(Math.min(b.state.index || 0, b.parsed.sentences.length - 1), { instant: true });
 }
-export function closeReader() { closeViewer(); closeSheets(); clear(); R.phase = 'idle'; keepAwake(false); persist(); flushAll(); closeAssets(); book = null; }
+export function closeReader() { setFullscreen(false); closeViewer(); closeSheets(); clear(); R.phase = 'idle'; keepAwake(false); persist(); flushAll(); closeAssets(); book = null; }
 
 // ---------------------------------------------------------------- engine
 const sentences = () => book.parsed.sentences;
@@ -153,6 +153,7 @@ document.addEventListener('selectionchange', () => {
 });
 $('#stage').addEventListener('click', e => {
   if (!book) return;
+  if (S.fullscreen) setFullscreen(true);        // re-enter after the back gesture left it (a tap is required)
   if (selAtDown || !getSelection().isCollapsed) { selAtDown = false; return; }
   audio.unlock();
   const x = e.clientX / window.innerWidth;
@@ -221,6 +222,7 @@ const SCHEMA = [
   ['lineHeight', 'Line height', 'step', { step: 0.1, min: 1, max: 2.5, fmt: v => v.toFixed(1) }],
   ['align', 'Alignment', 'select', ['left', 'center', 'justify']],
   ['minimal', 'Minimal display', 'toggle'],
+  ['fullscreen', 'Fullscreen', 'toggle'],
   ['Reading'],
   ['typewriter', 'Typewriter effect', 'toggle'],
   ['cps', 'Typing speed', 'step', { step: 5, min: 5, max: 200, fmt: v => v + ' cps' }],
@@ -286,6 +288,7 @@ function set(key, value) {
   S[key] = value;
   applySettings();
   if (key === 'rsvp' || key === 'bionic') show(R.idx, { instant: true });
+  if (key === 'fullscreen') setFullscreen(S.fullscreen);              // inside the toggle's tap = allowed
   if (key === 'auto') { if (S.auto) { audio.unlock(); setPaused(false); if (R.phase === 'holding') hold(); else if (R.phase === 'done') next(true); } else if (R.phase === 'holding') clear(); }
   persist();
 }
@@ -484,4 +487,12 @@ async function openNote(m) {
     const src = await assetText(path);
     body.textContent = (src && id && findNote(src, id)) || 'Note not found in this book.';
   }
+}
+
+// ---------------------------------------------------------------- fullscreen
+// Firefox Android has no fullscreen menu entry; pages may only request it from a tap. Back gesture exits it.
+function setFullscreen(on) {
+  const el = document.documentElement;
+  if (on && !document.fullscreenElement) el.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {});
+  else if (!on && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
 }

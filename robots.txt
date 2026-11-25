@@ -1,0 +1,4 @@
+# Not meant to be indexed. Note: crawlers only read /robots.txt at the domain root, so on a GitHub Pages project
+# site the <meta name="robots" content="noindex"> in each page is what actually applies.
+User-agent: *
+Disallow: /
