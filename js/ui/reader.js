@@ -5,7 +5,8 @@ import * as audio from '../audio.js';
 import { keepAwake } from '../wake.js';
 import { saveState, saveDefaults } from '../store/library.js';
 import { flushAll } from '../store/db.js';
-import { openAssets, closeAssets, assetUrl } from '../core/assets.js';
+import { openAssets, closeAssets, assetUrl, assetText } from '../core/assets.js';
+import { findNote } from '../core/epub.js';
 import { FONTS, THEMES, SOUNDS } from '../settings.js';
 
 const $ = s => document.querySelector(s);
@@ -13,7 +14,7 @@ const textEl = $('#text'), boxEl = $('#textBox'), readerEl = $('#reader');
 
 let book = null;      // { id, parsed, state }
 let S = null;         // settings of the current book (#28)
-const R = { idx: 0, chars: [], shown: 0, phase: 'idle', paused: false, timer: null, holdLeft: 0, holdStart: 0, words: [], wi: 0, nonSpace: 0 };
+const R = { idx: 0, chars: [], fn: [], shown: 0, phase: 'idle', paused: false, timer: null, holdLeft: 0, holdStart: 0, words: [], wi: 0, nonSpace: 0 };
 let onExit = () => {};
 
 // ---------------------------------------------------------------- public
@@ -55,17 +56,22 @@ function show(i, { instant = false } = {}) {
 
 function build(text, heading) {
   textEl.textContent = '';
-  R.chars = []; R.shown = 0; R.nonSpace = 0;
+  R.chars = []; R.fn = []; R.shown = 0; R.nonSpace = 0;
   const frag = document.createDocumentFragment();
+  // Footnote markers (#30): `pos` is a UTF-16 offset in the sentence; chars are code points.
+  const marks = (book.parsed.notes?.[R.idx] || []).map(m => ({ ...m, cp: [...text.slice(0, m.pos ?? text.length)].length }));
+  const addMarks = () => { while (marks.length && marks[0].cp <= R.chars.length) frag.appendChild(footMark(marks.shift())); };
   for (const part of text.split(/(\s+)/)) {
     const boldN = S.bionic && !heading && /\S/.test(part) ? Math.ceil(part.length / 2) : 0;
     let i = 0;
     for (const ch of part) {
+      addMarks();
       const el = document.createElement(i++ < boldN ? 'b' : 'span');
       el.textContent = ch; el.className = 'h';
       frag.appendChild(el); R.chars.push(el);
     }
   }
+  marks.forEach(m => { m.cp = R.chars.length; }); addMarks();
   textEl.appendChild(frag);
 }
 
@@ -74,6 +80,7 @@ function tick() {
   if (R.shown >= R.chars.length) return finishTyping();
   const el = R.chars[R.shown++];
   el.className = '';
+  for (const f of R.fn) if (f.cp <= R.shown) f.el.classList.remove('h');
   if (/\S/.test(el.textContent) && ++R.nonSpace % S.blipEvery === 0) audio.blip(S.sound);
   if (R.shown % 10 === 0) followCursor(el);
   R.timer = setTimeout(tick, 1000 / S.cps);
@@ -100,6 +107,7 @@ function finishTyping() {
   clear();
   if (R.phase === 'typing' && S.rsvp && R.wi < R.words.length) { R.wi = R.words.length; return rsvpTick(); }
   R.chars.forEach(c => { c.className = ''; });
+  R.fn.forEach(f => f.el.classList.remove('h'));
   R.shown = R.chars.length;
   R.phase = 'holding';
   R.holdLeft = S.autoBase + (S.rsvp ? 0 : sentences()[R.idx].length * S.autoPerChar) + (picsAt.has(R.idx) ? 2500 : 0);
@@ -292,7 +300,7 @@ function applySettings() {
 }
 
 // ---------------------------------------------------------------- sheets
-const RENDER = { settings: () => renderSettings(), chapters: () => renderChapters(), notes: () => renderNotes(), words: () => renderWords(), gallery: () => renderGallery() };
+const RENDER = { settings: () => renderSettings(), chapters: () => renderChapters(), notes: () => renderNotes(), words: () => renderWords(), gallery: () => renderGallery(), note: () => {} };
 function openSheet(which) {
   RENDER[which]();
   $('#sheetBg').hidden = false; $(`#${which}Sheet`).hidden = false;
@@ -448,3 +456,27 @@ $('#viewerGo').onclick = () => {
   const at = Math.min(viewing.img.at, sentences().length - 1);
   closeViewer(); closeSheets(); show(at, { instant: true });
 };
+
+// ---------------------------------------------------------------- footnotes (#30)
+// parsed.notes[sentence] = [{ label, target: 'path#id', pos }], parsed.footnotes['path#id'] = text (collected while
+// parsing). A target the parser didn't see is looked up in the EPUB file itself.
+function footMark(m) {
+  const b = document.createElement('button');
+  b.className = 'fn h'; b.textContent = m.label; b.title = 'Note ' + m.label;
+  b.addEventListener('pointerdown', e => e.stopPropagation());
+  b.onclick = e => { e.stopPropagation(); openNote(m); };
+  R.fn.push({ el: b, cp: m.cp });
+  return b;
+}
+async function openNote(m) {
+  setPaused(true);
+  $('#noteTitle').textContent = 'Note ' + m.label;
+  const body = $('#noteBody');
+  body.textContent = book.parsed.footnotes?.[m.target] || '…';
+  openSheet('note');
+  if (!book.parsed.footnotes?.[m.target]) {
+    const [path, id] = m.target.split('#');
+    const src = await assetText(path);
+    body.textContent = (src && id && findNote(src, id)) || 'Note not found in this book.';
+  }
+}

@@ -128,3 +128,11 @@ a.btn { text-decoration:none; }
 .viewer-bar button.icon { color:#ddd; }
 #viewerCaption { flex:1; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.75; }
 #viewerImg { flex:1; min-height:0; width:100%; object-fit:contain; padding-bottom:env(safe-area-inset-bottom); }
+
+/* Footnotes (#30) */
+#text .fn { font:700 .55em var(--ui); vertical-align:super; line-height:1; padding:2px 5px; margin:0 2px; border-radius:6px;
+  background:none; border:1px solid var(--accent); color:var(--accent); user-select:none; -webkit-user-select:none; text-shadow:none; }
+#text .fn.h { visibility:hidden; }
+.sheet.modal { left:14px; right:14px; bottom:auto; top:50%; transform:translateY(-50%); max-height:70vh; border:2px solid var(--accent);
+  border-radius:14px; padding-bottom:16px; }
+#noteBody { font:17px/1.5 var(--read-font); margin:6px 0 4px; white-space:pre-wrap; }

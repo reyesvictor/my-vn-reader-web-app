@@ -20,13 +20,18 @@ export async function importFile(file) {
 
 export async function openBook(id) {
   let parsed = await db.get('parsed', id);
+  const state = (await db.get('state', id)) || { index: 0, settings: await defaultSettings(), notes: '' };
   if (!parsed || parsed.parserVersion !== PARSER_VERSION) {
     const blob = await db.get('files', id);
     if (!blob) throw new Error('Book file missing — import it again.');
+    const old = parsed;
     parsed = await parseEpub(await blob.arrayBuffer());
     await db.put('parsed', id, parsed);
+    if (old?.sentences && state.index) {          // new parser = shifted indexes: keep the reader on the same sentence
+      state.index = remapIndex(old.sentences, parsed.sentences, state.index);
+      await db.put('state', id, { ...state, updatedAt: Date.now() });
+    }
   }
-  const state = (await db.get('state', id)) || { index: 0, settings: await defaultSettings(), notes: '' };
   state.settings = { ...DEFAULTS, ...state.settings };
   const meta = await db.get('meta', id);
   await db.put('meta', id, { ...meta, openedAt: Date.now(), total: parsed.sentences.length });
@@ -47,3 +52,15 @@ export async function listBooks() {
 export async function defaultSettings() { return { ...DEFAULTS, ...((await db.get('kv', 'defaults')) || {}) }; }
 export const saveDefaults = settings => db.put('kv', 'defaults', settings);
 export const saveState = (id, state) => db.putSoon('state', id, { ...state, updatedAt: Date.now() });
+
+// Same sentence text, nearest to the old index (the parse changed around it). Falls back to the old index.
+export function remapIndex(oldSentences, newSentences, idx) {
+  const text = oldSentences[idx];
+  const last = newSentences.length - 1;
+  if (text == null || newSentences[idx] === text) return Math.min(idx, last);
+  for (let d = 1; d <= 5000; d++) {
+    if (newSentences[idx - d] === text) return idx - d;
+    if (newSentences[idx + d] === text) return idx + d;
+  }
+  return Math.min(idx, last);
+}
