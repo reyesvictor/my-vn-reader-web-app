@@ -20,10 +20,11 @@ export const DEFAULTS = {
   minimal: false,        // minimal display (#25)
 };
 
-export const THEMES = ['Cyber', 'Dark', 'Light', 'Snow', 'Amber', 'Detective'];
+export const THEMES = ['Cyber', 'Dark', 'Light', 'Snow', 'Amber', 'Detective', 'VHS'];
 export const FONTS = {
   'Courier Prime': "'Courier Prime', 'Courier New', monospace",
   'Monocraft': "'Monocraft', monospace",
+  'VT323': "'VT323', monospace",             // VHS theme (#17)
   'Serif': "Georgia, 'Noto Serif', serif",
   'Sans': "system-ui, 'Roboto', sans-serif",
 };

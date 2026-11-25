@@ -2,6 +2,7 @@
 @font-face { font-family:'Courier Prime'; src:url(../fonts/CourierPrime-Bold.ttf); font-weight:700; font-display:swap; }
 @font-face { font-family:'Courier Prime'; src:url(../fonts/CourierPrime-Italic.ttf); font-style:italic; font-display:swap; }
 @font-face { font-family:'Monocraft'; src:url(../fonts/Monocraft.ttf); font-display:swap; }
+@font-face { font-family:'VT323'; src:url(../fonts/VT323-Regular.ttf); font-display:swap; }
 @font-face { font-family:'Monocraft'; src:url(../fonts/Monocraft-Bold.ttf); font-weight:700; font-display:swap; }
 
 :root {
@@ -15,6 +16,8 @@
 [data-theme="Light"]     { --bg:#f7f3ea; --fg:#222019; --dim:#8b8576; --accent:#b0612a; --panel:#ece6d8; --line:#d9d1bf; --glow:none; }
 [data-theme="Snow"]      { --bg:#0c1a2c; --fg:#eaf4ff; --dim:#7f9bb8; --accent:#9fd3ff; --panel:#13253b; --line:#22405f; --glow:0 0 6px rgba(190,225,255,.35); }
 [data-theme="Amber"]     { --bg:#1f1500; --fg:#ffb000; --dim:#8f6a14; --accent:#ffd166; --panel:#2a1d03; --line:#47330a; --glow:0 0 6px rgba(255,176,0,.35); }
+[data-theme="VHS"]       { --bg:#080a1c; --fg:#f4f4f0; --dim:#9298b4; --accent:#ff4a4a; --panel:#14172e; --line:#2b3056; --ui:'VT323', monospace;
+                           --glow:-1.5px 0 rgba(255,30,70,.6), 1.5px 0 rgba(0,210,255,.6); }
 [data-theme="Detective"] { --bg:#1a1815; --fg:#d9cfb9; --dim:#857a64; --accent:#c9a227; --panel:#24211c; --line:#3a352c; --glow:none; }
 
 * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -136,3 +139,26 @@ a.btn { text-decoration:none; }
 .sheet.modal { left:14px; right:14px; bottom:auto; top:50%; transform:translateY(-50%); max-height:70vh; border:2px solid var(--accent);
   border-radius:14px; padding-bottom:16px; }
 #noteBody { font:17px/1.5 var(--read-font); margin:6px 0 4px; white-space:pre-wrap; }
+
+/* VHS theme (#17): grey subtitle box, scanlines + flicker + a slow tracking band (compositor-only), OSD PLAY/PAUSE */
+[data-theme="VHS"] body, body[data-theme="VHS"] { font-size:19px; }
+[data-theme="VHS"] .hud-title, [data-theme="VHS"] #pct { font-size:15px; letter-spacing:1px; text-transform:uppercase; }
+[data-theme="VHS"] #text { background:rgba(46,46,46,.82); padding:6px 12px; border-radius:2px; }
+[data-theme="VHS"] #text.heading { background:none; font-size:calc(var(--read-size) * 1.3); }
+[data-theme="VHS"] #pauseMark { display:none !important; }
+#vhs { display:none; position:absolute; inset:0; pointer-events:none; z-index:2; overflow:hidden; }
+[data-theme="VHS"] #vhs { display:block; }
+#vhs::before { content:''; position:absolute; inset:0;
+  background:repeating-linear-gradient(to bottom, rgba(0,0,0,.28) 0 1px, transparent 1px 3px); animation:vhs-flicker 4s steps(1) infinite; }
+#vhs::after { content:''; position:absolute; left:0; right:0; top:-30%; height:18%; opacity:.5;
+  background:linear-gradient(to bottom, transparent, rgba(255,255,255,.05) 40%, rgba(255,255,255,.09) 50%, rgba(255,255,255,.05) 60%, transparent);
+  animation:vhs-track 9s linear infinite; }
+#vhsOsd { display:none; position:absolute; left:14px; bottom:calc(env(safe-area-inset-bottom) + 30px); z-index:3; pointer-events:none;
+  font:22px 'VT323', monospace; letter-spacing:1px; color:#f4f4f0; text-shadow:var(--glow); }
+[data-theme="VHS"] #vhsOsd { display:block; }
+#vhsOsd::before { content:'PLAY \25B6'; }
+#reader.paused #vhsOsd::before { content:'PAUSE \2759\2759'; animation:vhs-blink 1s steps(1) infinite; }
+@keyframes vhs-flicker { 0%, 100% { opacity:1; } 31% { opacity:.82; } 33% { opacity:1; } 72% { opacity:.9; } 73% { opacity:1; } }
+@keyframes vhs-track { to { transform:translateY(720%); } }
+@keyframes vhs-blink { 50% { opacity:0; } }
+@media (prefers-reduced-motion: reduce) { #vhs::before, #vhs::after, #reader.paused #vhsOsd::before { animation:none; } }

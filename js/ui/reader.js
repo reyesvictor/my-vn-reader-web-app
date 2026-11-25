@@ -278,6 +278,11 @@ function renderSettings() {
 }
 
 function set(key, value) {
+  if (key === 'theme' && (value === 'VHS') !== (S.font === 'VT323')) {      // the VHS theme brings its own font (#17)
+    if (value === 'VHS') S.font = 'VT323';
+    else if (S.theme === 'VHS') S.font = 'Courier Prime';
+    if (!$('#settingsSheet').hidden) requestAnimationFrame(renderSettings);
+  }
   S[key] = value;
   applySettings();
   if (key === 'rsvp' || key === 'bionic') show(R.idx, { instant: true });
