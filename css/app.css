@@ -4,6 +4,8 @@
 @font-face { font-family:'Monocraft'; src:url(../fonts/Monocraft.ttf); font-display:swap; }
 @font-face { font-family:'VT323'; src:url(../fonts/VT323-Regular.ttf); font-display:swap; }
 @font-face { font-family:'Monocraft'; src:url(../fonts/Monocraft-Bold.ttf); font-weight:700; font-display:swap; }
+@font-face { font-family:'Press Start 2P'; src:url(../fonts/PressStart2P-Regular.ttf); font-display:swap; }
+@font-face { font-family:'Creepster'; src:url(../fonts/Creepster-Regular.ttf); font-display:swap; }
 
 :root {
   --ui: 'Monocraft', monospace;
@@ -21,6 +23,10 @@
 [data-theme="VHS"]       { --bg:#080a1c; --fg:#f4f4f0; --dim:#9298b4; --accent:#ff4a4a; --panel:#14172e; --line:#2b3056; --ui:'VT323', monospace;
                            --glow:-1.5px 0 rgba(255,30,70,.6), 1.5px 0 rgba(0,210,255,.6); }
 [data-theme="Detective"] { --bg:#1a1815; --fg:#d9cfb9; --dim:#857a64; --accent:#c9a227; --panel:#24211c; --line:#3a352c; --glow:none; }
+[data-theme="Horror"]    { --bg:#080505; --fg:#cbbfab; --dim:#6e7a4c; --accent:#a8262a; --panel:#130b0a; --line:#2e1b18; --glow:none;
+                           --ui:Georgia, 'Noto Serif', serif; }
+[data-theme="Arcade"]    { --bg:#1a1c0f; --fg:#e4d6a4; --dim:#8e8b5d; --accent:#f08a24; --panel:#262915; --line:#4a4c2a; --glow:none;
+                           --ui:'Press Start 2P', monospace; }
 
 * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); }
@@ -168,3 +174,44 @@ a.btn { text-decoration:none; }
 @keyframes vhs-track { to { transform:translateY(720%); } }
 @keyframes vhs-blink { 50% { opacity:0; } }
 @media (prefers-reduced-motion: reduce) { #vhs::before, #vhs::after, #reader.paused #vhsOsd::before { animation:none; } }
+
+/* Horror theme (#38): bone text on near-black, blood-red accent, sickly green dim; Creepster for headings only.
+   Still vignette + film grain (one static layer, no animation: nothing to flicker, see #37). */
+[data-theme="Horror"] .lib-head h1, [data-theme="Horror"] .sheet h2, [data-theme="Horror"] #text.heading {
+  font-family:'Creepster', Georgia, serif; font-weight:400; letter-spacing:2px; color:var(--accent); }
+[data-theme="Horror"] .lib-head h1 { font-size:30px; }
+[data-theme="Horror"] #text.heading { font-size:calc(var(--read-size) * 1.4); }
+[data-theme="Horror"] .hud-title { font-style:italic; font-size:13px; }
+#horror { display:none; position:absolute; inset:0; pointer-events:none; z-index:2;
+  background:
+    radial-gradient(ellipse 85% 75% at 50% 50%, transparent 55%, rgba(0,0,0,.78) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .5 0 0 0 0 .42 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity:.18; }
+[data-theme="Horror"] #horror { display:block; }
+
+/* Arcade theme (#38): original military-arcade look in khaki/olive with an orange "fire" accent. Chunky pixel UI
+   (Press Start 2P), square corners, hard 3px drop shadows (no blur), striped ammo-style progress bar. */
+[data-theme="Arcade"] body, body[data-theme="Arcade"] { font-size:10px; line-height:1.8; }
+[data-theme="Arcade"] button, [data-theme="Arcade"] .btn, [data-theme="Arcade"] select { border-radius:0; border-width:2px; box-shadow:3px 3px 0 #000; }
+[data-theme="Arcade"] button.icon, [data-theme="Arcade"] .book .open, [data-theme="Arcade"] .book .del, [data-theme="Arcade"] .switch::after { box-shadow:none; }
+[data-theme="Arcade"] button.icon { font-family:system-ui, sans-serif; }
+[data-theme="Arcade"] .book, [data-theme="Arcade"] .sheet { border-radius:0; border-width:2px; }
+[data-theme="Arcade"] .sheet { border-top-width:4px; }
+[data-theme="Arcade"] .switch, [data-theme="Arcade"] .switch::after { border-radius:0; }
+[data-theme="Arcade"] .lib-head h1 { font-size:16px; color:var(--accent); text-shadow:3px 3px 0 #000; }
+[data-theme="Arcade"] .book .t { font-family:var(--ui); font-size:11px; line-height:1.6; }
+[data-theme="Arcade"] .sheet h2 { font-size:12px; color:var(--accent); }
+[data-theme="Arcade"] .sheet h3 { font-size:9px; }
+[data-theme="Arcade"] .row { font-size:9px; }
+[data-theme="Arcade"] .hud-title { font-size:8px; text-transform:uppercase; }
+[data-theme="Arcade"] #pct { font-size:8px; }
+[data-theme="Arcade"] .chapter-list li { font-family:var(--ui); font-size:10px; line-height:1.7; }
+[data-theme="Arcade"] .chapter-list li small { font-size:8px; }
+[data-theme="Arcade"] #text.heading { font-family:'Press Start 2P', monospace; font-size:calc(var(--read-size) * .8); line-height:1.6;
+  text-shadow:3px 3px 0 #000; }
+[data-theme="Arcade"] #chBar { height:6px; background:#000; }
+[data-theme="Arcade"] #chBar > div, [data-theme="Arcade"] .bar > div {
+  background:repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 8px); }
+[data-theme="Arcade"] .bar { border-radius:0; height:5px; }
+[data-theme="Arcade"] #pauseMark { font-size:0; opacity:.55; color:var(--accent); }
+[data-theme="Arcade"] #pauseMark::before { content:'PAUSE'; font:18px 'Press Start 2P', monospace; text-shadow:3px 3px 0 #000; }

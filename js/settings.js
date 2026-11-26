@@ -21,11 +21,12 @@ export const DEFAULTS = {
   fullscreen: false,     // full screen while reading (needs a tap to enter: browser rule)
 };
 
-export const THEMES = ['Cyber', 'Dark', 'Light', 'Snow', 'Amber', 'Detective', 'VHS'];
+export const THEMES = ['Cyber', 'Dark', 'Light', 'Snow', 'Amber', 'Detective', 'VHS', 'Horror', 'Arcade'];
 export const FONTS = {
   'Courier Prime': "'Courier Prime', 'Courier New', monospace",
   'Monocraft': "'Monocraft', monospace",
   'VT323': "'VT323', monospace",             // VHS theme (#17)
+  'Press Start 2P': "'Press Start 2P', monospace",   // Arcade theme (#38), optional (very wide: try 14–16px)
   'Serif': "Georgia, 'Noto Serif', serif",
   'Sans': "system-ui, 'Roboto', sans-serif",
 };
