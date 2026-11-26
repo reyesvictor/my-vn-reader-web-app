@@ -220,8 +220,13 @@ function updateHud() {
   $('#btnAuto').textContent = S.auto ? '❚❚' : '▶';
   $('#btnAuto').classList.toggle('on', S.auto);
 }
+// Read / unread (#41): chapters before the current one are read, unless the owner long-pressed one to say otherwise.
+// Overrides live in state.chapterMarks, keyed by title + opening text (not the index: survives a re-parse).
+const chapterKey = c => c.title + '\u0001' + sentences().slice(c.start, c.start + 3).join(' ').slice(0, 120);
 function renderChapters() {
   const list = $('#chapterList'), ch = book.parsed.chapters, cur = chapterIndex(R.idx);
+  const marks = book.state.chapterMarks ||= {};
+  const isRead = i => marks[chapterKey(ch[i])] ?? i < cur;
   list.innerHTML = '';
   ch.forEach((c, i) => {
     const li = document.createElement('li');
@@ -229,14 +234,49 @@ function renderChapters() {
     const len = (ch[i + 1]?.start ?? sentences().length) - c.start;
     li.textContent = c.title;
     const small = document.createElement('small');
-    small.textContent = i === cur ? `${Math.round(chapterProgress(i, R.idx) * 100)}% · ${len} sentences` : `${len} sentences`;
+    const paint = () => {
+      const k = chapterKey(c), mark = k in marks ? (marks[k] ? ' · ✓ marked read' : ' · marked unread') : '';
+      small.textContent = (i === cur ? `${Math.round(chapterProgress(i, R.idx) * 100)}% · ` : '') + `${len} sentences${mark}`;
+      li.classList.toggle('read', isRead(i));
+    };
+    paint();
     li.appendChild(small);
-    if (i < cur) li.className = 'read';
-    if (i === cur) { li.className = 'current'; const bar = document.createElement('div'); bar.className = 'bar'; bar.innerHTML = `<div style="width:${chapterProgress(i, R.idx) * 100}%"></div>`; li.appendChild(bar); }
-    li.onclick = () => { closeSheets(); show(c.start, { instant: true }); };
+    if (i === cur) { li.classList.add('current'); const bar = document.createElement('div'); bar.className = 'bar'; bar.innerHTML = `<div style="width:${chapterProgress(i, R.idx) * 100}%"></div>`; li.appendChild(bar); }
+    const press = longPress(li, () => {
+      const k = chapterKey(c), read = !isRead(i);
+      if (read === i < cur) delete marks[k]; else marks[k] = read;      // back to the default = no override
+      paint(); persist();
+      toast(read ? '✓ Marked as read' : 'Marked as unread');
+    });
+    li.onclick = () => { if (press.consumed()) return; closeSheets(); show(c.start, { instant: true }); };
     list.appendChild(li);
   });
   requestAnimationFrame(() => list.children[cur]?.scrollIntoView({ block: 'center' }));
+}
+
+// Long-press (~500 ms, cancelled by moving/scrolling) or right-click on desktop. The click that ends a long-press
+// is swallowed (consumed()), so it doesn't also jump to the chapter.
+function longPress(el, onLong) {
+  let timer = null, x0 = 0, y0 = 0, fired = false;
+  const cancel = () => { clearTimeout(timer); timer = null; el.classList.remove('pressing'); };
+  const fire = () => { cancel(); fired = true; onLong(); };
+  el.addEventListener('pointerdown', e => {
+    fired = false;
+    if (e.button > 0) return;                    // right button: contextmenu follows
+    x0 = e.clientX; y0 = e.clientY;
+    el.classList.add('pressing');
+    timer = setTimeout(fire, 500);
+  });
+  el.addEventListener('pointermove', e => { if (timer && Math.hypot(e.clientX - x0, e.clientY - y0) > 10) cancel(); });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(ev, () => { if (timer) cancel(); });
+  el.addEventListener('contextmenu', e => { e.preventDefault(); if (!fired) fire(); });   // desktop right-click / Android long-press
+  return { consumed: () => { const f = fired; fired = false; return f; } };
+}
+
+let toastTimer = null;
+function toast(msg) {
+  const el = $('#toast'); el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 1600);
 }
 
 // ---------------------------------------------------------------- settings (#19 #23 #25 #28)

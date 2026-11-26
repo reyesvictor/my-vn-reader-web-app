@@ -112,7 +112,14 @@ body.minimal .hide-minimal { visibility:hidden; }
 .row.stat .stat-val { color:var(--accent); text-align:right; font-size:13px; }
 .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
 .chapter-list { list-style:none; padding:0; margin:0; }
-.chapter-list li { padding:11px 6px; border-bottom:1px solid var(--line); font-family:Georgia, serif; font-size:15px; cursor:pointer; }
+.chapter-list li { padding:11px 6px; border-bottom:1px solid var(--line); font-family:Georgia, serif; font-size:15px; cursor:pointer;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.chapter-list li.pressing { background:var(--line); transition:background .45s; }
+.sheet-hint { color:var(--dim); font-size:11px; margin:0 0 6px; }
+#toast { position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 40px); transform:translateX(-50%); z-index:30; pointer-events:none;
+  background:var(--panel); color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:8px 14px; font-size:13px;
+  white-space:nowrap; opacity:0; transition:opacity .2s; }
+#toast.show { opacity:1; }
 .chapter-list li small { display:block; font:11px var(--ui); color:var(--dim); margin-top:3px; }
 .chapter-list li.read { opacity:.55; }
 .chapter-list li.current { border-left:3px solid var(--accent); padding-left:10px; opacity:1; }
