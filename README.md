@@ -10,7 +10,8 @@ Live: https://reyesvictor.github.io/my-vn-reader-web-app/
 ## Status
 v1: library (import EPUBs, progress kept even after removing a book), sentence-by-sentence reader with typewriter,
 auto mode, pause, bionic, RSVP, sounds + volume, wake lock, chapters from the real table of contents with chapter
-progress, per-book settings, themes (Cyber, Dark, Light, Snow, Amber, Detective), minimal display.
+progress, per-book settings, themes (Cyber, Dark, Light, Snow, Amber, Detective, VHS, Horror, Arcade), night dim, minimal display. Then: notes, word
+lookup, images, footnotes, reading stats, chapter read/unread marks. The reader always opens paused (tap the middle).
 `spike/` is the feasibility test page that validated the web approach on the phone (Firefox).
 
 ## Layout
@@ -22,7 +23,7 @@ js/core/zip.js              ZIP reader (native DecompressionStream)
 js/core/epub.js             EPUB → sentences / headings / chapters (spine + nav/ncx TOC, #anchors) / images / notes
 js/core/splitter.js         sentence splitter (abbreviations, quotes « » „ “ ” "…") — pure, tested in node
 js/store/db.js, library.js  IndexedDB (meta, parsed cache, files, per-book state, kv)
-js/settings.js audio.js wake.js
+js/settings.js audio.js wake.js dim.js (night dim) stats.js (reading records)
 fonts/ sfx/ icons/ sw.js manifest.webmanifest
 tests/splitter.test.js      npm test (node ≥ 18, no dependencies)
 ```
