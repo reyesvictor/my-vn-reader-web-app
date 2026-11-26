@@ -2,6 +2,7 @@
 import * as db from './db.js';
 import { parseEpub, PARSER_VERSION } from '../core/epub.js';
 import { DEFAULTS } from '../settings.js';
+import { initStats } from '../stats.js';
 
 export async function importFile(file) {
   const buffer = await file.arrayBuffer();
@@ -10,10 +11,15 @@ export async function importFile(file) {
   await db.put('files', id, new Blob([buffer], { type: 'application/epub+zip' }));
   await db.put('parsed', id, parsed);
   const old = await db.get('meta', id);
-  await db.put('meta', id, { id, title: parsed.meta.title, author: parsed.meta.author, total: parsed.sentences.length,
-    addedAt: old?.addedAt || Date.now(), openedAt: old?.openedAt || 0 });
+  const meta = { id, title: parsed.meta.title, author: parsed.meta.author, total: parsed.sentences.length,
+    addedAt: old?.addedAt || Date.now(), openedAt: old?.openedAt || 0 };
+  await db.put('meta', id, meta);
   const state = await db.get('state', id);
-  if (!state) await db.put('state', id, { index: 0, settings: await defaultSettings(), notes: '', updatedAt: Date.now() });
+  if (!state) {
+    const fresh = { index: 0, settings: await defaultSettings(), notes: '', updatedAt: Date.now() };
+    initStats(fresh, meta);
+    await db.put('state', id, fresh);
+  }
   navigator.storage?.persist?.();
   return { id, restored: !!state };
 }
@@ -34,6 +40,7 @@ export async function openBook(id) {
   }
   state.settings = { ...DEFAULTS, ...state.settings };
   const meta = await db.get('meta', id);
+  initStats(state, meta);                       // books from before #40: "started before tracking" if in progress
   await db.put('meta', id, { ...meta, openedAt: Date.now(), total: parsed.sentences.length });
   await db.put('kv', 'lastBook', id);
   return { id, parsed, state };

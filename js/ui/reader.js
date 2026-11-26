@@ -9,6 +9,7 @@ import { openAssets, closeAssets, assetUrl, assetText } from '../core/assets.js'
 import { findNote } from '../core/epub.js';
 import { FONTS, THEMES, SOUNDS } from '../settings.js';
 import { dimLevel, setDim } from '../dim.js';
+import { IDLE_CAP, countWords, statRows } from '../stats.js';
 
 const $ = s => document.querySelector(s);
 const textEl = $('#text'), boxEl = $('#textBox'), readerEl = $('#reader');
@@ -27,7 +28,26 @@ export function openReader(b, { exit }) {
   applySettings();
   show(Math.min(b.state.index || 0, b.parsed.sentences.length - 1), { instant: true });
 }
-export function closeReader() { setFullscreen(false); closeViewer(); closeSheets(); clear(); R.phase = 'idle'; keepAwake(false); persist(); flushAll(); closeAssets(); book = null; }
+export function closeReader() {
+  if (book) { R.paused = true; track(); }
+  setFullscreen(false); closeViewer(); closeSheets(); clear(); R.phase = 'idle'; keepAwake(false); persist(); flushAll(); closeAssets(); book = null;
+}
+
+// ---------------------------------------------------------------- reading records (#40)
+// track() runs after every state change and input: it adds the time since its last call if the reader was
+// active then (visible, not paused), at most IDLE_CAP (no input for minutes in manual mode = not reading).
+const ST = { on: false, last: 0 };
+function track() {
+  const st = book?.state.stats, now = Date.now();
+  if (st && ST.on) st.activeMs += Math.min(now - ST.last, IDLE_CAP);
+  ST.on = !!st && !R.paused && document.visibilityState === 'visible'; ST.last = now;
+}
+function countRead(i) {             // sentence i was read and the reader moves on to i + 1
+  const st = book.state.stats; if (!st) return;
+  st.sentences++; st.words += countWords(sentences()[i] || '');
+  if (!st.startedAt && !st.preTracking) st.startedAt = Date.now();
+  if (i + 1 >= sentences().length - 1 && !st.finishedAt) st.finishedAt = Date.now();
+}
 
 // ---------------------------------------------------------------- engine
 const sentences = () => book.parsed.sentences;
@@ -42,6 +62,7 @@ function show(i, { instant = false } = {}) {
   showPics(R.idx);
   boxEl.scrollTop = 0;
   updateHud();
+  track();
   persist();
   if (S.rsvp && !heading && !instant) {
     textEl.classList.add('rsvp');
@@ -125,6 +146,7 @@ function hold() {
 function next(auto = false) {
   if (R.idx >= sentences().length - 1) { R.phase = 'done'; return; }
   audio.next(auto ? 'off' : S.sound);
+  countRead(R.idx);
   show(R.idx + 1);
 }
 
@@ -132,6 +154,7 @@ function setPaused(p) {
   if (p === R.paused) return;
   if (p && R.phase === 'holding' && R.timer) R.holdLeft = Math.max(400, R.holdLeft - (performance.now() - R.holdStart));
   R.paused = p; clear();
+  track();
   readerEl.classList.toggle('paused', p);
   updateWake();
   if (!p) {
@@ -154,6 +177,7 @@ document.addEventListener('selectionchange', () => {
 });
 $('#stage').addEventListener('click', e => {
   if (!book) return;
+  track();                                       // any tap = the owner is there (#40)
   if (S.fullscreen) setFullscreen(true);        // re-enter after the back gesture left it (a tap is required)
   if (selAtDown || !getSelection().isCollapsed) { selAtDown = false; return; }
   audio.unlock();
@@ -164,6 +188,7 @@ $('#stage').addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => {
   if (!book) return;
+  track();
   if (!$('#viewer').hidden) { if (e.key === 'Escape') closeViewer(); return; }
   if (!$('#sheetBg').hidden) return;                          // typing in a sheet (notes) must not turn pages
   if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); $('#stage').dispatchEvent(new MouseEvent('click', { clientX: innerWidth * 0.9 })); }
@@ -281,6 +306,20 @@ function renderSettings() {
   const notes = document.createElement('button'); notes.textContent = '✎ Notes';     // reachable in minimal display too
   notes.onclick = () => { closeSheets(); setPaused(true); openSheet('notes'); };
   act.append(lib, notes, def); body.appendChild(act);
+  renderStats(body);
+}
+
+function renderStats(body) {        // reading records (#40)
+  const st = book.state.stats; if (!st) return;
+  track();
+  let left = 0; for (let i = R.idx + 1; i < sentences().length; i++) left += countWords(sentences()[i]);
+  const h = document.createElement('h3'); h.textContent = 'Stats'; body.appendChild(h);
+  for (const [label, value] of statRows(st, left)) {
+    const row = document.createElement('div'); row.className = 'row stat';
+    const l = document.createElement('span'); l.textContent = label;
+    const v = document.createElement('span'); v.className = 'stat-val'; v.textContent = value;
+    row.append(l, v); body.appendChild(row);
+  }
 }
 
 function set(key, value) {
@@ -331,6 +370,7 @@ $('#sheetBg').onclick = closeSheets;
 document.querySelectorAll('.sheet .close').forEach(b => { b.onclick = closeSheets; });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') { if (book) setPaused(true); persist(); flushAll(); }   // back = still paused (#39)
+  track();
 });
 addEventListener('pagehide', () => { persist(); flushAll(); });
 
