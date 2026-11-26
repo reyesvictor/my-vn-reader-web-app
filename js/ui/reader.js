@@ -21,7 +21,7 @@ let onExit = () => {};
 // ---------------------------------------------------------------- public
 export function openReader(b, { exit }) {
   book = b; S = b.state.settings; onExit = exit;
-  R.paused = false; readerEl.classList.remove('paused');
+  R.paused = true; readerEl.classList.add('paused');     // never auto-start: the owner taps the middle to read (#39)
   openAssets(b.id);
   indexImages();
   applySettings();
@@ -293,7 +293,8 @@ function set(key, value) {
   applySettings();
   if (key === 'rsvp' || key === 'bionic') show(R.idx, { instant: true });
   if (key === 'fullscreen') setFullscreen(S.fullscreen);              // inside the toggle's tap = allowed
-  if (key === 'auto') { if (S.auto) { audio.unlock(); setPaused(false); if (R.phase === 'holding') hold(); else if (R.phase === 'done') next(true); } else if (R.phase === 'holding') clear(); }
+  // Auto starts right away only from the HUD ▶ (a tap on the reader); from the Settings sheet it waits, paused (#39).
+  if (key === 'auto') { if (S.auto) { audio.unlock(); if ($('#sheetBg').hidden) setPaused(false); if (R.phase === 'holding') hold(); else if (R.phase === 'done') next(true); } else if (R.phase === 'holding') clear(); }
   persist();
 }
 
@@ -324,12 +325,13 @@ function closeSheets() {
   document.activeElement?.blur?.();
   const sel = getSelection();
   if (!sel.isCollapsed && !textEl.contains(sel.anchorNode)) sel.removeAllRanges();   // or the next tap is swallowed
-  if (wasOpen) flushAll();
-  if (book && wasOpen) setPaused(false);
+  if (wasOpen) flushAll();                  // stays paused: reading resumes only on the owner's tap (#39)
 }
 $('#sheetBg').onclick = closeSheets;
 document.querySelectorAll('.sheet .close').forEach(b => { b.onclick = closeSheets; });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { persist(); flushAll(); } });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { if (book) setPaused(true); persist(); flushAll(); }   // back = still paused (#39)
+});
 addEventListener('pagehide', () => { persist(); flushAll(); });
 
 // ---------------------------------------------------------------- notes per book (#2)
@@ -443,11 +445,10 @@ function renderGallery() {
 }
 
 // Full-screen viewer. It pushes a history entry so the phone's back button closes it (and not the reader).
-let viewing = null;              // { img, resume }
+let viewing = null;              // { img }
 async function openViewer(img, { inline = false } = {}) {
-  const resume = inline && !R.paused;
   if (inline) setPaused(true);
-  viewing = { img, resume };
+  viewing = { img };
   const ci = chapterIndex(Math.min(img.at, sentences().length - 1));
   $('#viewerCaption').textContent = [book.parsed.chapters[ci]?.title, img.alt].filter(t => t && t !== '—' && !/^(image|img|cover|logo)$/i.test(t)).join(' · ');
   $('#viewerGo').hidden = inline;
@@ -457,10 +458,9 @@ async function openViewer(img, { inline = false } = {}) {
 }
 function closeViewer({ fromHistory = false } = {}) {
   if (!viewing) return;
-  const { resume } = viewing; viewing = null;
+  viewing = null;
   $('#viewer').hidden = true; $('#viewerImg').removeAttribute('src');
-  if (!fromHistory && history.state?.viewer) history.back();
-  if (resume && book) setPaused(false);
+  if (!fromHistory && history.state?.viewer) history.back();      // stays paused (#39)
 }
 addEventListener('popstate', () => { if (viewing) closeViewer({ fromHistory: true }); });
 $('#viewerBack').onclick = $('#viewerClose').onclick = () => closeViewer();

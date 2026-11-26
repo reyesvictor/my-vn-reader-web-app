@@ -73,7 +73,10 @@ select { background:var(--panel); border:1px solid var(--line); border-radius:8p
 #text.heading { text-align:center; font-weight:700; letter-spacing:.5px; color:var(--accent); }
 #text.rsvp { text-align:center; font-size:calc(var(--read-size) * 1.6); }
 #text .orp { color:#ff4d4d; }
-#pauseMark { position:absolute; inset:0; display:none; place-content:center; font-size:56px; color:var(--fg); opacity:.18; pointer-events:none; z-index:2; }
+#pauseMark { position:absolute; inset:0; display:none; place-content:center; justify-items:center; gap:6px; color:var(--fg); pointer-events:none; z-index:2; }
+#pauseMark span { font-size:56px; line-height:1; opacity:.18; }
+#pauseMark small { position:absolute; left:0; right:0; bottom:calc(env(safe-area-inset-bottom) + 34px); text-align:center;
+  font:12px var(--ui); color:var(--dim); opacity:.8; }
 #reader.paused #pauseMark { display:grid; }
 body.minimal .hide-minimal { visibility:hidden; }
 
@@ -213,5 +216,6 @@ a.btn { text-decoration:none; }
 [data-theme="Arcade"] #chBar > div, [data-theme="Arcade"] .bar > div {
   background:repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 8px); }
 [data-theme="Arcade"] .bar { border-radius:0; height:5px; }
-[data-theme="Arcade"] #pauseMark { font-size:0; opacity:.55; color:var(--accent); }
-[data-theme="Arcade"] #pauseMark::before { content:'PAUSE'; font:18px 'Press Start 2P', monospace; text-shadow:3px 3px 0 #000; }
+[data-theme="Arcade"] #pauseMark span { font-size:0; opacity:.3; color:var(--accent); }
+[data-theme="Arcade"] #pauseMark span::before { content:'PAUSE'; font:18px 'Press Start 2P', monospace; text-shadow:3px 3px 0 #000; }
+[data-theme="Arcade"] #pauseMark small { font-size:8px; }
