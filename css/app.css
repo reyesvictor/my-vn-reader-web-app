@@ -8,10 +8,12 @@
 :root {
   --ui: 'Monocraft', monospace;
   --read-font: 'Courier Prime', monospace; --read-size: 24px; --read-lh: 1.5; --read-align: left;
-  --bg: #0a0a0a; --fg: #7ff9ff; --dim: #4c8a8f; --accent: #ff4fd8; --panel: #121a1c; --line: #1f3236; --glow: 0 0 8px rgba(0,255,255,.45);
+  --bg: #000; --fg: #63cdd3; --dim: #3b6e72; --accent: #c25aa9; --panel: #0b1214; --line: #1a2a2d; --glow: none;
 }
 /* ---------- Themes ---------- */
-[data-theme="Cyber"]     { --bg:#05090b; --fg:#7ff9ff; --dim:#3f7b80; --accent:#ff4fd8; --panel:#0f171a; --line:#1d3236; --glow:0 0 8px rgba(0,255,255,.45); }
+/* Cyber, night-safe (#37): pure black (OLED pixels off, no near-black shimmer), softer cyan, no blurred halo,
+   and a muted magenta (bright cyan next to bright magenta "vibrates" on its own). */
+[data-theme="Cyber"]     { --bg:#000; --fg:#63cdd3; --dim:#3b6e72; --accent:#c25aa9; --panel:#0b1214; --line:#1a2a2d; --glow:none; }
 [data-theme="Dark"]      { --bg:#121212; --fg:#e4e4e4; --dim:#7a7a7a; --accent:#8ab4f8; --panel:#1c1c1c; --line:#2c2c2c; --glow:none; }
 [data-theme="Light"]     { --bg:#f7f3ea; --fg:#222019; --dim:#8b8576; --accent:#b0612a; --panel:#ece6d8; --line:#d9d1bf; --glow:none; }
 [data-theme="Snow"]      { --bg:#0c1a2c; --fg:#eaf4ff; --dim:#7f9bb8; --accent:#9fd3ff; --panel:#13253b; --line:#22405f; --glow:0 0 6px rgba(190,225,255,.35); }
@@ -68,6 +70,10 @@ select { background:var(--panel); border:1px solid var(--line); border-radius:8p
 #pauseMark { position:absolute; inset:0; display:none; place-content:center; font-size:56px; color:var(--fg); opacity:.18; pointer-events:none; z-index:2; }
 #reader.paused #pauseMark { display:grid; }
 body.minimal .hide-minimal { visibility:hidden; }
+
+/* Night dim (#37): a still black layer over everything (compositor-only). Dimming in the page lets the phone's own
+   brightness stay higher, where OLED panels flicker less. */
+#dim { position:fixed; inset:0; background:#000; opacity:0; pointer-events:none; z-index:100; }
 
 /* Snow theme: flakes on a compositor-only layer (transform animation, no repaint) */
 #snow { display:none; position:absolute; left:0; right:0; top:-100%; height:200%; pointer-events:none; z-index:0; opacity:.55;

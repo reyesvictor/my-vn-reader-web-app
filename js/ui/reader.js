@@ -8,6 +8,7 @@ import { flushAll } from '../store/db.js';
 import { openAssets, closeAssets, assetUrl, assetText } from '../core/assets.js';
 import { findNote } from '../core/epub.js';
 import { FONTS, THEMES, SOUNDS } from '../settings.js';
+import { dimLevel, setDim } from '../dim.js';
 
 const $ = s => document.querySelector(s);
 const textEl = $('#text'), boxEl = $('#textBox'), readerEl = $('#reader');
@@ -221,6 +222,7 @@ const SCHEMA = [
   ['fontSize', 'Text size', 'step', { step: 2, min: 14, max: 48, fmt: v => v + 'px' }],
   ['lineHeight', 'Line height', 'step', { step: 0.1, min: 1, max: 2.5, fmt: v => v.toFixed(1) }],
   ['align', 'Alignment', 'select', ['left', 'center', 'justify']],
+  ['dim', 'Night dim (all books)', 'step', { step: 10, min: 0, max: 80, fmt: v => v ? v + '%' : 'off' }],
   ['minimal', 'Minimal display', 'toggle'],
   ['fullscreen', 'Fullscreen', 'toggle'],
   ['Reading'],
@@ -257,9 +259,11 @@ function renderSettings() {
       sel.onchange = () => { set(key, sel.value); if (key === 'sound') { audio.unlock(); audio.blip(S.sound); } };
       ctl.appendChild(sel);
     } else if (type === 'step') {
-      const val = document.createElement('span'); val.className = 'val'; val.textContent = opt.fmt(S[key]);
+      const cur = () => key === 'dim' ? dimLevel() : S[key];          // night dim is global (#37)
+      const val = document.createElement('span'); val.className = 'val'; val.textContent = opt.fmt(cur());
       const mk = (txt, d) => { const b = document.createElement('button'); b.textContent = txt;
-        b.onclick = () => { set(key, +Math.min(opt.max, Math.max(opt.min, S[key] + d * opt.step)).toFixed(2)); val.textContent = opt.fmt(S[key]); }; return b; };
+        b.onclick = () => { const v = +Math.min(opt.max, Math.max(opt.min, cur() + d * opt.step)).toFixed(2);
+          if (key === 'dim') setDim(v); else set(key, v); val.textContent = opt.fmt(cur()); }; return b; };
       ctl.append(mk('−', -1), val, mk('+', 1));
     } else if (type === 'range') {
       const r = document.createElement('input'); Object.assign(r, { type: 'range', min: opt.min, max: opt.max, step: opt.step, value: S[key] });

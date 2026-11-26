@@ -2,6 +2,7 @@
 import { importFile, openBook, removeBook, listBooks, defaultSettings } from './store/library.js';
 import { openReader, closeReader } from './ui/reader.js';
 import { get } from './store/db.js';
+import { loadDim } from './dim.js';
 
 const $ = s => document.querySelector(s);
 const status = msg => { $('#libStatus').textContent = msg || ''; };
@@ -18,6 +19,7 @@ async function route() {
     closeReader();
     $('#reader').hidden = true; $('#library').hidden = false;
     document.body.dataset.theme = (await defaultSettings()).theme;
+    document.querySelector('meta[name=theme-color]').content = getComputedStyle(document.body).getPropertyValue('--bg').trim();
     renderLibrary();
   }
 }
@@ -66,5 +68,6 @@ $('#fileInput').onchange = async e => {
 };
 
 addEventListener('hashchange', route);
+loadDim();
 route();
 if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
