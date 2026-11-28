@@ -1,10 +1,10 @@
-// EPUB → { meta, sentences, headings, chapters, images, notes, footnotes } — browser only (DOMParser).
+// EPUB → { meta, sentences, headings, chapters, images, notes, footnotes, breaks } — browser only (DOMParser).
 // Reads files in SPINE order (#9) and builds chapters from the real table of contents (nav.xhtml or toc.ncx),
 // including chapters that start at an #anchor in the middle of a file.
 import { unzip } from './zip.js';
 import { splitParagraph, normalizeSpace, SPLITTER_VERSION } from './splitter.js';
 
-export const PARSER_VERSION = 102 + SPLITTER_VERSION;   // bump to force re-parsing cached books
+export const PARSER_VERSION = 103 + SPLITTER_VERSION;   // bump to force re-parsing cached books
 
 const BLOCK = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'section', 'article',
   'header', 'footer', 'aside', 'dt', 'dd', 'pre', 'table', 'tr', 'td', 'th', 'figure', 'figcaption', 'ul', 'ol',
@@ -13,6 +13,8 @@ const SKIP = new Set(['script', 'style', 'head', 'title', 'svg:title', 'noscript
 const HEADING = /^h[1-6]$/;
 const MARK = '\uE000';                         // placeholder for a footnote marker while a paragraph is collected
 const LABEL = /^[[(]?\d{1,3}[\])]?$/;
+const ORNAMENT = /^[\s*#~§⁂•·◆◇❖✦✧＊_=-]+$/;  // "* * *", "***", "§", "⁂", "#", "~~~" alone on a line = scene break
+const blankText = s => !s.replace(/[\s\u00a0\u200b\u2007\u202f\ufeff]/g, '');
 const isMarker = (el, txt) => (el.localName === 'a' && (el.getAttribute('href') || '').includes('#') || el.localName === 'sup') && LABEL.test(txt);
 
 const xml = s => new DOMParser().parseFromString(s, 'application/xml');
@@ -61,6 +63,9 @@ export async function parseEpub(buffer) {
   const sentences = [], headings = [], images = [], notes = {}, footnotes = {};
   const noteTargets = new Set();      // 'path#id' of every footnote marker seen so far (notes come after their refs)
   const fileStart = {}, anchorAt = {};
+  const gaps = [];                    // scene-break candidates (#42): { at, para, file, strong }
+  const fileParas = [];               // per file: [first, end) paragraph numbers
+  let paraCount = 0;
   for (const path of spine) {
     const src = await zip.text(path);
     if (src == null) continue;
@@ -68,6 +73,8 @@ export async function parseEpub(buffer) {
     const doc = html(src);
     const body = doc.body || byLocal(doc, 'body')[0];
     if (!body) continue;
+    const file = fileParas.length;
+    fileParas.push([paraCount, paraCount]);
     let buf = '';
     let pending = [];
     let marks = [];                   // footnote markers of the paragraph being collected, in order of MARK
@@ -99,7 +106,9 @@ export async function parseEpub(buffer) {
         (notes[base + j] ||= []).push({ ...m, pos: Math.max(0, Math.min(o - starts[j], parts[j].length)) });
       });
       sentences.push(...parts);
+      paraCount++;
     };
+    const gap = strong => { flush(); gaps.push({ at: sentences.length, para: paraCount, file, strong }); };
     const walk = (node) => {
       for (const child of node.childNodes) {
         if (child.nodeType === 3) { buf += child.data; continue; }
@@ -129,12 +138,19 @@ export async function parseEpub(buffer) {
           }
           continue;
         }
+        // Scene breaks (#42): <hr>, an ornament line ("* * *"), or an empty paragraph (<p>&nbsp;</p>).
+        if (tag === 'hr') { gap(true); continue; }
+        if ((tag === 'p' || tag === 'div') && !child.querySelector('img, image, svg, hr')) {
+          if (blankText(txt)) { gap(false); continue; }
+          if (txt.length <= 20 && ORNAMENT.test(txt) && /[^\s_=-]/.test(txt)) { gap(true); continue; }
+        }
         if (BLOCK.has(tag)) { flush(); walk(child); flush(tag); }
         else walk(child);
       }
     };
     walk(body);
     flush();
+    fileParas[file][1] = paraCount;
     for (const id of pending) anchorAt[path + '#' + id] = sentences.length;
   }
 
@@ -167,7 +183,40 @@ export async function parseEpub(buffer) {
   if (chapters.length && chapters[0].start > 0) chapters.unshift({ title: '—', start: 0, depth: 0 });
   if (!chapters.length) chapters.push({ title: meta.title, start: 0, depth: 0 });
 
-  return { meta, sentences, headings, chapters, images, notes, footnotes, parserVersion: PARSER_VERSION };
+  const breaks = sceneBreaks(gaps, fileParas, sentences, new Set([...headings, ...chapters.map(c => c.start)]));
+  return { meta, sentences, headings, chapters, images, notes, footnotes, breaks, parserVersion: PARSER_VERSION };
+}
+
+// ---- scene breaks (#42) ----
+// Returns the sentence indexes that start a new scene. <hr> and ornament lines are explicit. Empty paragraphs are
+// also used for layout (letter headers, front-matter lists, spacing around chapter numbers), so they only count if:
+//  - they are inside a file, with text on both sides, and not next to a heading or chapter start;
+//  - the text before them ends a sentence ("Objet : CONFIDENTIEL", "Cher Monsieur,", "Le Pingouin, 2000" don't);
+//  - they aren't part of a run of blank-separated paragraphs (a letter with a blank line between paragraphs):
+//    not 1 paragraph away from another blank, and not within 4 paragraphs of one on both sides.
+const SENTENCE_END = /[.!?…»”"')\]]$/;
+function sceneBreaks(gaps, fileParas, sentences, heads) {
+  const merged = [];
+  for (const g of gaps) {
+    const last = merged[merged.length - 1];
+    if (last && last.at === g.at && last.file === g.file) last.strong ||= g.strong;
+    else merged.push({ ...g });
+  }
+  const inside = merged.filter(g => {
+    const [first, end] = fileParas[g.file];
+    return g.para > first && g.para < end && g.at > 0 && g.at < sentences.length && !heads.has(g.at) && !heads.has(g.at - 1);
+  });
+  const out = [];
+  for (const [k, g] of inside.entries()) {
+    if (g.strong) { out.push(g.at); continue; }
+    if (!SENTENCE_END.test(sentences[g.at - 1])) continue;
+    const prev = inside.slice(0, k).reverse().find(x => !x.strong && x.file === g.file);
+    const next = inside.slice(k + 1).find(x => !x.strong && x.file === g.file);
+    const before = g.para - (prev?.para ?? fileParas[g.file][0]), after = (next?.para ?? fileParas[g.file][1]) - g.para;
+    if (before <= 1 || after <= 1 || (before <= 4 && after <= 4)) continue;
+    out.push(g.at);
+  }
+  return out;
 }
 
 // ---- footnotes (#30) ----

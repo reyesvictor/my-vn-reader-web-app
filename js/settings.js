@@ -10,6 +10,7 @@ export const DEFAULTS = {
   bionic: false,
   rsvp: false,
   wpm: 250,
+  sceneBreaks: true,     // * * * on the first sentence after a scene / point-of-view change (#42)
   auto: false,
   autoBase: 900,         // ms pause after a sentence is fully shown…
   autoPerChar: 15,       // …plus this many ms per character (typing at 25 cps already paces the reading)

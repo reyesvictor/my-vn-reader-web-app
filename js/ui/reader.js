@@ -51,6 +51,7 @@ function countRead(i) {             // sentence i was read and the reader moves 
 
 // ---------------------------------------------------------------- engine
 const sentences = () => book.parsed.sentences;
+const sceneAt = i => !!book.parsed.breaks?.includes(i);
 function clear() { clearTimeout(R.timer); R.timer = null; }
 
 function show(i, { instant = false } = {}) {
@@ -59,6 +60,8 @@ function show(i, { instant = false } = {}) {
   const text = sentences()[R.idx] || '';
   const heading = book.parsed.headings.includes(R.idx);
   textEl.className = heading ? 'heading' : '';
+  // First sentence of a new scene / point of view (#42): * * * above it, and the box fades in.
+  boxEl.classList.toggle('scene', !!S.sceneBreaks && sceneAt(R.idx));
   showPics(R.idx);
   boxEl.scrollTop = 0;
   updateHud();
@@ -132,7 +135,8 @@ function finishTyping() {
   R.fn.forEach(f => f.el.classList.remove('h'));
   R.shown = R.chars.length;
   R.phase = 'holding';
-  R.holdLeft = S.autoBase + (S.rsvp ? 0 : sentences()[R.idx].length * S.autoPerChar) + (picsAt.has(R.idx) ? 2500 : 0);
+  R.holdLeft = S.autoBase + (S.rsvp ? 0 : sentences()[R.idx].length * S.autoPerChar) + (picsAt.has(R.idx) ? 2500 : 0)
+    + (S.sceneBreaks && sceneAt(R.idx + 1) ? 1500 : 0);    // a beat before the scene changes (#42)
   hold();
 }
 
@@ -295,6 +299,7 @@ const SCHEMA = [
   ['cps', 'Typing speed', 'step', { step: 5, min: 5, max: 200, fmt: v => v + ' cps' }],
   ['bionic', 'Bionic reading', 'toggle'],
   ['rsvp', 'RSVP (word by word)', 'toggle'],
+  ['sceneBreaks', 'Mark scene changes (* * *)', 'toggle'],
   ['wpm', 'RSVP speed', 'step', { step: 25, min: 50, max: 1000, fmt: v => v + ' wpm' }],
   ['Auto mode'],
   ['auto', 'Auto mode', 'toggle'],
@@ -370,7 +375,7 @@ function set(key, value) {
   }
   S[key] = value;
   applySettings();
-  if (key === 'rsvp' || key === 'bionic') show(R.idx, { instant: true });
+  if (key === 'rsvp' || key === 'bionic' || key === 'sceneBreaks') show(R.idx, { instant: true });
   if (key === 'fullscreen') setFullscreen(S.fullscreen);              // inside the toggle's tap = allowed
   // Auto starts right away only from the HUD ▶ (a tap on the reader); from the Settings sheet it waits, paused (#39).
   if (key === 'auto') { if (S.auto) { audio.unlock(); if ($('#sheetBg').hidden) setPaused(false); if (R.phase === 'holding') hold(); else if (R.phase === 'done') next(true); } else if (R.phase === 'holding') clear(); }

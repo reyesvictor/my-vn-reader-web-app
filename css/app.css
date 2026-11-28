@@ -73,6 +73,12 @@ select { background:var(--panel); border:1px solid var(--line); border-radius:8p
 #text.heading { text-align:center; font-weight:700; letter-spacing:.5px; color:var(--accent); }
 #text.rsvp { text-align:center; font-size:calc(var(--read-size) * 1.6); }
 #text .orp { color:#ff4d4d; }
+/* scene / point-of-view change (#42): * * * above the first sentence of the new scene, which fades in */
+#textBox.scene #text::before { content:'*\a0\a0*\a0\a0*'; display:block; text-align:center; color:var(--accent);
+  font-size:1em; line-height:1; margin-bottom:.6em; font-weight:700; letter-spacing:0; }
+#textBox.scene #text { animation:scene-in .7s ease-out; }
+@keyframes scene-in { from { opacity:0; } }
+@media (prefers-reduced-motion: reduce) { #textBox.scene #text { animation:none; } }
 #pauseMark { position:absolute; inset:0; display:none; place-content:center; justify-items:center; gap:6px; color:var(--fg); pointer-events:none; z-index:2; }
 #pauseMark span { font-size:56px; line-height:1; opacity:.18; }
 #pauseMark small { position:absolute; left:0; right:0; bottom:calc(env(safe-area-inset-bottom) + 34px); text-align:center;
